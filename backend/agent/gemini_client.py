@@ -8,10 +8,11 @@ from backend.models import (
 
 
 class GeminiClient:
-    """Interfaces with Gemini 3.8 Flash via google-genai SDK with autonomous function calling and fallback intelligence."""
+    """Interfaces with Gemini (gemini-3.5-flash-lite / gemini-3.8-flash) via google-genai SDK with autonomous function calling and fallback intelligence."""
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "").strip()
+        self.model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
         self._client = None
         self._init_sdk()
 
@@ -19,7 +20,14 @@ class GeminiClient:
         if self.api_key:
             try:
                 from google import genai
-                self._client = genai.Client(api_key=self.api_key)
+                from google.genai import types
+                self._client = genai.Client(
+                    api_key=self.api_key,
+                    http_options=types.HttpOptions(
+                        timeout=15000,
+                        retry_options=types.HttpRetryOptions(attempts=2)
+                    )
+                )
             except Exception as e:
                 print(f"[GeminiClient] Could not initialize google-genai SDK: {e}")
                 self._client = None
@@ -85,7 +93,7 @@ class GeminiClient:
             return None
 
         kwargs: Dict[str, Any] = {
-            "model": "gemini-3.8-flash",
+            "model": self.model,
             "input": input_data
         }
         if previous_interaction_id:
@@ -131,7 +139,7 @@ Example:
 ]
 """
                 resp = self._client.interactions.create(
-                    model="gemini-3.8-flash",
+                    model=self.model,
                     input=prompt
                 )
                 text = (resp.output_text or "").strip()
@@ -217,7 +225,7 @@ Output STRICTLY a valid JSON object matching this schema:
 }}
 """
                 resp = self._client.interactions.create(
-                    model="gemini-3.8-flash",
+                    model=self.model,
                     input=prompt
                 )
                 text = (resp.output_text or "").strip()
@@ -241,7 +249,7 @@ Output STRICTLY a valid JSON object matching this schema:
                         strategic_implications=data.get("strategic_implications", []),
                         citations=citations,
                         knowledge_graph=kg,
-                        metrics={"model": "gemini-3.8-flash", "tokens": 1420}
+                        metrics={"model": self.model, "tokens": 1420}
                     )
             except Exception as e:
                 print(f"[GeminiClient] Gemini synthesis error: {e}. Using fallback synthesizer.")

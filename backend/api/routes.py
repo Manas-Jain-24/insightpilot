@@ -25,7 +25,7 @@ def create_router(
     orchestrator = ResearchOrchestrator(vector_store, gemini_client, db=db)
 
     @router.get("/health")
-    async def health_check():
+    def health_check():
         reports_count = len(db.list_reports()) if db else 0
         return {
             "status": "healthy",
@@ -69,11 +69,11 @@ def create_router(
                 pass
 
     @router.get("/documents", response_model=List[DocumentMetadata])
-    async def list_documents():
+    def list_documents():
         return vector_store.list_documents()
 
     @router.delete("/documents/{doc_id}")
-    async def delete_document(doc_id: str):
+    def delete_document(doc_id: str):
         if not vector_store.get_document(doc_id):
             raise HTTPException(status_code=404, detail="Document not found")
         vector_store.remove_document(doc_id)
@@ -105,14 +105,14 @@ def create_router(
 
     # ---------------- Report History & Database Persistence ----------------
     @router.get("/reports")
-    async def list_reports():
+    def list_reports():
         """Lists past saved research reports from SQLite."""
         if not db:
             return []
         return db.list_reports()
 
     @router.get("/reports/{report_id}", response_model=ResearchReport)
-    async def get_report(report_id: str):
+    def get_report(report_id: str):
         """Retrieves full research report by ID."""
         if not db:
             raise HTTPException(status_code=503, detail="Database not configured")
@@ -122,7 +122,7 @@ def create_router(
         return report
 
     @router.delete("/reports/{report_id}")
-    async def delete_report(report_id: str):
+    def delete_report(report_id: str):
         """Deletes a report from SQLite."""
         if not db:
             raise HTTPException(status_code=503, detail="Database not configured")
@@ -132,7 +132,7 @@ def create_router(
         return {"status": "success", "message": f"Report '{report_id}' deleted"}
 
     @router.get("/research/quick-topics")
-    async def get_quick_topics():
+    def get_quick_topics():
         return [
             {
                 "id": "agents",

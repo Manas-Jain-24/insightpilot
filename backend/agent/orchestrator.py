@@ -46,7 +46,7 @@ class ResearchOrchestrator:
         }
         await asyncio.sleep(0.3)
 
-        plan = self.gemini_client.plan_research(query, doc_names, depth=request.depth)
+        plan = await asyncio.to_thread(self.gemini_client.plan_research, query, doc_names, depth=request.depth)
         yield {
             "event": "plan",
             "data": [p.model_dump() for p in plan]
@@ -69,7 +69,8 @@ class ResearchOrchestrator:
                     f"Use these tools to gather facts before synthesizing a final answer."
                 )
 
-                interaction = self.gemini_client.create_interaction(
+                interaction = await asyncio.to_thread(
+                    self.gemini_client.create_interaction,
                     input_data=system_prompt,
                     tools=self.gemini_client.get_registered_tools()
                 )
@@ -173,7 +174,8 @@ class ResearchOrchestrator:
                             await asyncio.sleep(0.3)
 
                             # Send tool execution result back to Gemini
-                            interaction = self.gemini_client.create_interaction(
+                            interaction = await asyncio.to_thread(
+                                self.gemini_client.create_interaction,
                                 previous_interaction_id=interaction.id,
                                 input_data=[{
                                     "type": "function_result",
@@ -273,7 +275,8 @@ class ResearchOrchestrator:
         }
         await asyncio.sleep(0.4)
 
-        report = self.gemini_client.synthesize_final_report(
+        report = await asyncio.to_thread(
+            self.gemini_client.synthesize_final_report,
             query=query,
             observations=observations,
             citations=citations,
@@ -287,7 +290,7 @@ class ResearchOrchestrator:
         # Auto-save report to SQLite database
         if self.db:
             try:
-                self.db.save_report(report)
+                await asyncio.to_thread(self.db.save_report, report)
             except Exception as e:
                 print(f"[ResearchOrchestrator] Failed to auto-save report to DB: {e}")
 
