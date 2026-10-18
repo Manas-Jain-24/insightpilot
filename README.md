@@ -58,11 +58,11 @@ Unlike conventional single-turn LLM chatbots that hallucinate citations and suff
 │   └────────────────────────────────────────────────────────────────────────────────┘   │
 │                                           │                                            │
 │                                           ▼                                            │
-│   ┌─────────────────────────────┐   ┌─────────────────────────────┐                    │
-│   │   Hybrid Vector Database    │   │      Gemini 3.8 Flash       │                    │
-│   │ (pypdf + TF-IDF/Cosine Sim) │   │ (google-genai / Simulator)  │                    │
-│   └─────────────────────────────┘   └─────────────────────────────┘                    │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+│   ┌─────────────────────────────┐   ┌─────────────────────────────┐   ┌─────────────────────────────┐
+│   │   Hybrid Vector Database    │   │      Gemini 3.5 / 3.8 Flash │   │      Persistent SQLite DB   │
+│   │ (pypdf + TF-IDF/Cosine Sim) │   │ (google-genai / Simulator)  │   │   (WAL Mode / Auto-Save)    │
+│   └─────────────────────────────┘   └─────────────────────────────┘   └─────────────────────────────┘
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
                                            │
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -135,18 +135,33 @@ Interactive API Docs (Swagger): **`http://127.0.0.1:8080/docs`**
 
 ---
 
+---
+
+## 💡 Why InsightPilot vs. ChatGPT or Public Chatbots?
+
+| Dimension | Prompting ChatGPT / Gemini Web | InsightPilot Autonomous Agent Architecture |
+| :--- | :--- | :--- |
+| **Citations & Verification** | **Probabilistic token prediction**: LLMs hallucinate non-existent URLs (404s), fake DOI papers, and wrong page references when asked to "cite sources". | **Deterministic software retrieval**: Citations are extracted directly from vector chunks and live API payloads. Fake citations cannot physically appear. |
+| **Data Privacy & Governance** | Data enters external third-party chat systems, risking exposure of proprietary internal documentation or NDA contracts. | **100% Local / Self-Hosted Sovereignty**: All documents, chunks, and SQLite session history stay securely within your infrastructure boundary. |
+| **Execution Paradigm** | **Single-turn black-box completion**: Gives a one-off linear best guess without showing intermediate reasoning. | **Autonomous ReAct Agent Loop**: Explicit cognitive decomposition (`Thought ➔ Action ➔ Observation`) with dynamic tool selection and live SSE streaming. |
+| **Output Structure** | Unstructured markdown text walls requiring manual reformatting and parsing. | **Strictly Typed Pydantic Data Contract**: Executive summaries, ranked findings, comparative matrix tables, strategic takeaways, and HTML5 Canvas knowledge graphs. |
+| **Enterprise Integration** | Cannot be integrated programmatically into microservices, CI/CD, or automated ETL workflows. | **Production FastAPI REST & SSE API**: Programmatic endpoints for document ingestion, streaming research, and SQLite persistent report querying. |
+
+---
+
 ## 🧪 Running Automated Tests
 
 ```bash
 python -m unittest tests/test_agent.py
 ```
 
-All 5 core unit and integration tests verify:
+All 6 core unit and integration tests verify:
 - Semantic chunking & PDF text extraction.
 - Vector store indexing & cosine similarity retrieval.
-- Web search tool execution.
+- Multi-strategy web search tool execution.
 - Knowledge graph entity building.
 - ReAct orchestrator event streaming.
+- SQLite database persistent storage & CRUD operations.
 
 ---
 
@@ -154,11 +169,14 @@ All 5 core unit and integration tests verify:
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/health` | Healthcheck & vector index status |
-| `POST` | `/api/documents/upload` | Multipart file upload (PDF/TXT/MD) & vector chunking |
+| `GET` | `/api/health` | Healthcheck, model configuration & vector index stats |
+| `POST` | `/api/documents/upload` | Multipart file upload (PDF/TXT/MD/JSON/CSV) & vector chunking |
 | `GET` | `/api/documents` | List all indexed document metadata |
 | `DELETE` | `/api/documents/{id}` | Delete document from vector database |
-| `POST` | `/api/research/stream` | Server-Sent Events (SSE) streaming research loop |
+| `POST` | `/api/research/stream` | Server-Sent Events (SSE) streaming ReAct research loop |
+| `GET` | `/api/reports` | List all saved research reports from persistent SQLite |
+| `GET` | `/api/reports/{id}` | Retrieve full structured research report by ID |
+| `DELETE` | `/api/reports/{id}` | Delete report from persistent SQLite database |
 | `GET` | `/api/research/quick-topics` | Pre-bundled sample research topics |
 | `POST` | `/api/export/markdown` | Generate downloadable Markdown report |
 
