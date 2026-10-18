@@ -1,0 +1,13 @@
+Quantum Computing and Post-Quantum Cryptography State of the Industry 2025/2026
+
+1. Logical Qubit Milestones and Error Correction
+Recent experimental milestones across neutral atom arrays and superconducting circuits have validated fault-tolerant quantum error correction. By employing surface codes and Color codes with physical-to-logical qubit ratios approaching 100:1, researchers have demonstrated two-qubit logical gate fidelities exceeding 99.9%. Logical qubits now demonstrate operational coherence times substantially exceeding their underlying physical component constituents.
+
+2. NIST Post-Quantum Cryptography (PQC) Standards
+In response to Shor's algorithm risks against RSA and elliptic curve cryptography, the National Institute of Standards and Technology (NIST) finalized its primary post-quantum encryption algorithms:
+- ML-KEM (Module-Lattice-Based Key-Encapsulation Mechanism, formerly Kyber): Primary standard for general encryption.
+- ML-DSA (Module-Lattice-Based Digital Signature Algorithm, formerly Dilithium): Primary standard for digital signatures.
+- SLH-DSA (Stateless Hash-Based Digital Signature Algorithm, formerly SPHINCS+): High-assurance fallback signature standard.
+
+3. Enterprise Migration Timelines and Hybrid Key Exchange
+Major financial institutions and defense organizations are mandating 'hybrid key exchange' implementations—combining classical ECDH with ML-KEM-768—to protect against 'Harvest Now, Decrypt Later' (HNDL) adversarial campaigns. Migration audits across enterprise TLS infrastructure and HSM hardware are projected through 2028.

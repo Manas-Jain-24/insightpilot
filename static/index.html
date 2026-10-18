@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InsightPilot | Autonomous Multimodal Research & Knowledge Agent</title>
+  <meta name="description" content="Production-grade AI research agent featuring ReAct loops, vector RAG, tool calling, and live knowledge synthesis.">
+  
+  <!-- Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-icon">🧠</div>
+      <div class="brand-text">
+        <h1>InsightPilot</h1>
+        <span>Autonomous Research Agent</span>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <div class="status-badge" id="agentStatusBadge">
+        <span class="pulse-dot"></span>
+        <span id="agentStatusText">ReAct Agent Ready</span>
+      </div>
+
+      <button class="btn btn-secondary" id="btnOpenDocs" title="Manage Ingested Documents">
+        📁 Ingested Docs (<span id="docsCountPill">0</span>)
+      </button>
+
+      <button class="btn btn-secondary" id="btnOpenSettings" title="Configure Gemini API or Simulation Mode">
+        ⚙️ Settings
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+    
+    <!-- Hero / Query Input Console -->
+    <section class="hero-card">
+      <div class="hero-header">
+        <h2>Autonomous Multimodal Research & Knowledge Synthesis</h2>
+        <p>Enter any technical topic, market domain, or question. The agent autonomously plans, executes vector RAG, searches the web, and generates verifiable executive reports.</p>
+      </div>
+
+      <div class="prompt-box">
+        <textarea 
+          id="queryInput" 
+          class="prompt-textarea" 
+          placeholder="e.g. Compare Hybrid RAG with Graph RAG architectures regarding retrieval latency, token efficiency, and grounded factual accuracy..."
+          rows="2"
+        ></textarea>
+
+        <div class="prompt-controls">
+          <div class="controls-left">
+            <div class="select-pill">
+              <span>Depth:</span>
+              <select id="depthSelect">
+                <option value="quick">Quick Brief (1-2 Min)</option>
+                <option value="balanced" selected>Balanced Research (3-5 Min)</option>
+                <option value="deep">Deep Investigative (Multi-Pass)</option>
+              </select>
+            </div>
+
+            <label class="select-pill" style="cursor: pointer;">
+              <input type="checkbox" id="checkUseDocs" checked style="accent-color: var(--accent-cyan);">
+              <span>Query Vector RAG</span>
+            </label>
+
+            <label class="select-pill" style="cursor: pointer;">
+              <input type="checkbox" id="checkUseWeb" checked style="accent-color: var(--accent-cyan);">
+              <span>Search Web Knowledge</span>
+            </label>
+          </div>
+
+          <button id="btnRunAgent" class="btn btn-primary">
+            <span>⚡ Launch Agentic Research</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 1-Click Demo Quick Picks -->
+      <div class="quick-topics">
+        <span class="quick-label">⚡ Demo Quick-Picks:</span>
+        <span class="chip-tag" data-query="What are the latest architectures and evaluation benchmarks for autonomous multi-agent systems and ReAct loops in 2025/2026?">
+          🤖 Autonomous Agent Architectures
+        </span>
+        <span class="chip-tag" data-query="Compare Hybrid RAG (Dense + Sparse retrieval) with Graph-based RAG in terms of latency, token cost, and factual grounding.">
+          🔍 Hybrid vs Graph RAG
+        </span>
+        <span class="chip-tag" data-query="Analyze recent breakthroughs in quantum error correction and industry migration timelines for NIST Post-Quantum Cryptography.">
+          ⚛️ Quantum & PQC Standards
+        </span>
+      </div>
+    </section>
+
+    <!-- Workspace Grid -->
+    <div class="workspace-grid">
+      
+      <!-- Left Column: Agent Cognitive Trace -->
+      <aside class="trace-panel">
+        <div class="panel-title">
+          <h3>
+            <span>🔬</span> Agent Cognitive Trace
+          </h3>
+          <span id="traceTimer" style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--text-muted);">0.0s</span>
+        </div>
+
+        <!-- Dynamic Execution Plan -->
+        <div class="steps-list" id="planStepsContainer">
+          <div class="step-card">
+            <div class="step-badge">1</div>
+            <div class="step-info">
+              <h4>Planning & Task Decomposition</h4>
+              <p>Formulate multi-pass execution trajectory</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-badge">2</div>
+            <div class="step-info">
+              <h4>Vector Store RAG Retrieval</h4>
+              <p>Extract semantic matches from documents</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-badge">3</div>
+            <div class="step-info">
+              <h4>External Web Intel Querying</h4>
+              <p>Cross-reference live industry standards</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-badge">4</div>
+            <div class="step-info">
+              <h4>Grounded Synthesis & Knowledge Graph</h4>
+              <p>Compile executive brief with verified citations</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Step-by-Step Reason/Action/Observation Logs -->
+        <div class="trace-log" id="traceLogsContainer">
+          <div class="log-entry thought">
+            <div class="log-header thought-header">System Initialized</div>
+            <p>Agent standing by. Enter a research topic above or click a demo quick-pick to initiate the autonomous loop.</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right Column: Final Executive Synthesis Report -->
+      <section class="report-panel" id="reportPanel">
+        
+        <!-- Empty State Before Run -->
+        <div class="empty-state" id="reportEmptyState">
+          <div class="empty-icon">📊</div>
+          <h3>Intelligence Report Workspace</h3>
+          <p>Launch an autonomous research run to see live citations, comparative matrix analysis, and an interactive knowledge graph appear here in real time.</p>
+        </div>
+
+        <!-- Generated Report Container (Initially Hidden) -->
+        <div id="reportContent" style="display: none;">
+          <div class="report-header">
+            <div class="report-title">
+              <h2 id="reportHeaderTitle">Executive Research Report</h2>
+              <div class="report-meta">
+                <span id="reportTimestamp">Today</span>
+                <span>•</span>
+                <span id="reportDuration">0.0s</span>
+                <span>•</span>
+                <span id="reportCitationsCount">0 Citations</span>
+                <span>•</span>
+                <span class="status-badge" style="padding: 0.2rem 0.6rem; font-size: 0.72rem;" id="reportModelBadge">Gemini 3.8 Flash</span>
+              </div>
+            </div>
+
+            <div class="report-actions">
+              <button class="btn btn-secondary" id="btnExportMarkdown" title="Download Report as Markdown">
+                📥 Export Markdown
+              </button>
+              <button class="btn btn-secondary" id="btnPrintReport" title="Print or Save as PDF">
+                🖨️ Print
+              </button>
+            </div>
+          </div>
+
+          <!-- Executive Summary Section -->
+          <div class="section-card">
+            <h3><span>📌</span> Executive Summary</h3>
+            <p class="exec-summary-text" id="execSummaryContent"></p>
+          </div>
+
+          <!-- Key Analytical Findings Section -->
+          <div class="section-card">
+            <h3><span>🔍</span> Key Analytical Findings & Grounded Evidence</h3>
+            <div id="findingsContainer"></div>
+          </div>
+
+          <!-- Comparative Matrix Table -->
+          <div class="section-card" id="comparativeMatrixSection" style="display: none;">
+            <h3><span>⚖️</span> Comparative Evaluation Matrix</h3>
+            <div style="overflow-x: auto;">
+              <table class="matrix-table" id="matrixTable">
+                <thead id="matrixHead"></thead>
+                <tbody id="matrixBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Interactive Concept Knowledge Graph -->
+          <div class="section-card">
+            <h3><span>🌐</span> Interactive Knowledge & Entity Graph</h3>
+            <div class="canvas-wrapper">
+              <canvas id="kgCanvas"></canvas>
+            </div>
+          </div>
+
+          <!-- Strategic Implications -->
+          <div class="section-card" id="strategicSection" style="display: none;">
+            <h3><span>🎯</span> Strategic Implications & Action Items</h3>
+            <ul id="strategicList" style="padding-left: 1.25rem; color: #cbd5e1; font-size: 0.92rem; line-height: 1.8;"></ul>
+          </div>
+
+          <!-- Citations Reference List -->
+          <div class="section-card">
+            <h3><span>📚</span> Grounded Citations & Sources</h3>
+            <div id="citationsReferenceList"></div>
+          </div>
+
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Document Ingestion Modal -->
+  <div class="modal-backdrop" id="docsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📁 Ingested Documents & RAG Vector Index</h3>
+        <button class="close-btn" id="btnCloseDocs">&times;</button>
+      </div>
+
+      <div class="dropzone" id="fileDropzone">
+        <div class="dropzone-icon">📄</div>
+        <h4>Drag & Drop research PDFs, Markdown, or TXT</h4>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem;">Documents are semantically chunked and indexed into the Vector Store.</p>
+        <input type="file" id="fileInput" accept=".pdf,.txt,.md,.json,.csv" style="display: none;">
+      </div>
+
+      <h4 style="margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-muted);">Currently Indexed in Vector Store:</h4>
+      <div class="file-list" id="docsListContainer">
+        <div style="font-size: 0.85rem; color: var(--text-muted);">Loading documents...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings / API Key Modal -->
+  <div class="modal-backdrop" id="settingsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>⚙️ Agent Settings & Credentials</h3>
+        <button class="close-btn" id="btnCloseSettings">&times;</button>
+      </div>
+
+      <div style="margin-bottom: 1.5rem;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem;">
+          Google Gemini API Key (Optional)
+        </label>
+        <input 
+          type="password" 
+          id="apiKeyInput" 
+          placeholder="AIzaSy..." 
+          style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #fff; font-family: var(--font-mono); font-size: 0.85rem;"
+        >
+        <p style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.4rem;">
+          InsightPilot is powered by <strong>Gemini 3.8 Flash</strong> via the official <code>google-genai</code> SDK. If no key is entered, InsightPilot runs in <strong>Autonomous High-Fidelity Demo Mode</strong> so recruiters can test without configuration.
+        </p>
+      </div>
+
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); padding: 1rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+        <div style="font-weight: 600; color: #fff; margin-bottom: 0.3rem;">Portfolio Architecture Highlights:</div>
+        <div>• <strong>Framework:</strong> FastAPI & Pydantic V2 Asynchronous Architecture</div>
+        <div>• <strong>Orchestration:</strong> ReAct Agent Loop (Plan ➔ Reason ➔ Act ➔ Observe ➔ Synthesize)</div>
+        <div>• <strong>Retrieval:</strong> Hybrid Semantic RAG + Cosine Vector Matching</div>
+        <div>• <strong>Streaming:</strong> Server-Sent Events (SSE) with Real-Time Latency Telemetry</div>
+      </div>
+
+      <button class="btn btn-primary" id="btnSaveSettings" style="width: 100%; justify-content: center;">
+        Save & Apply Configuration
+      </button>
+    </div>
+  </div>
+
+  <!-- Citation Detail Modal -->
+  <div class="modal-backdrop" id="citationModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="citationModalTitle">Citation Excerpt</h3>
+        <button class="close-btn" id="btnCloseCitation">&times;</button>
+      </div>
+      <div id="citationModalBody"></div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
