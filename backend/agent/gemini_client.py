@@ -8,7 +8,7 @@ from backend.models import (
 
 
 class GeminiClient:
-    """Interfaces with Gemini 3.8 Flash via google-genai SDK, with graceful local intelligence fallback."""
+    """Interfaces with Gemini 3.8 Flash via google-genai SDK with autonomous function calling and fallback intelligence."""
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "").strip()
@@ -31,11 +31,74 @@ class GeminiClient:
     def has_api_key(self) -> bool:
         return bool(self.api_key and self._client)
 
+    def get_registered_tools(self) -> List[Dict[str, Any]]:
+        """Declarations of tools available to Gemini for autonomous function calling."""
+        return [
+            {
+                "type": "function",
+                "name": "search_documents",
+                "description": "Searches user-uploaded documents (PDFs, Markdown, technical reports) using vector semantic search.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Specific keywords or question to retrieve relevant chunks from ingested documents"
+                        },
+                        "top_k": {
+                            "type": "integer",
+                            "description": "Number of document chunks to retrieve (default 3)"
+                        }
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
+                "type": "function",
+                "name": "search_web",
+                "description": "Queries external live web knowledge, industry benchmarks, and encyclopedic sources.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Web search query"
+                        },
+                        "num_results": {
+                            "type": "integer",
+                            "description": "Number of search results to return (default 3)"
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        ]
+
+    def create_interaction(
+        self,
+        input_data: Any,
+        previous_interaction_id: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None
+    ):
+        """Dispatches an interaction to Gemini 3.8 Flash."""
+        if not self.has_api_key():
+            return None
+
+        kwargs: Dict[str, Any] = {
+            "model": "gemini-3.8-flash",
+            "input": input_data
+        }
+        if previous_interaction_id:
+            kwargs["previous_interaction_id"] = previous_interaction_id
+        if tools:
+            kwargs["tools"] = tools
+
+        return self._client.interactions.create(**kwargs)
+
     def embed_text(self, text: str) -> Optional[List[float]]:
         if not self.has_api_key():
             return None
         try:
-            # Model: gemini-embedding-001
             resp = self._client.models.embed_content(
                 model="gemini-embedding-001",
                 contents=text
@@ -61,18 +124,17 @@ Create a numbered 4-step execution plan for an autonomous research workflow.
 Return strictly a valid JSON array of objects with keys: "id" (int), "title" (string), "description" (string).
 Example:
 [
-  {{"id": 1, "title": "Deconstruct Scope & Retrieve Document Context", "description": "Search local documents for relevant excerpts"}},
-  {{"id": 2, "title": "Query External Web Intel", "description": "Perform web search for state-of-the-art benchmarks"}},
-  {{"id": 3, "title": "Analyze Tradeoffs & Comparative Metrics", "description": "Synthesize findings across internal and external data"}},
-  {{"id": 4, "title": "Synthesize Executive Report with Grounded Citations", "description": "Draft comprehensive structured report with citations"}}
+  {{"id": 1, "title": "Deconstruct Scope & Query Document Store", "description": "Formulate search queries for local document context"}},
+  {{"id": 2, "title": "Retrieve Web Intel & State-of-the-Art Benchmarks", "description": "Gather live external verification and industry data"}},
+  {{"id": 3, "title": "Cross-Source Evidence Synthesis & Trade-off Analysis", "description": "Synthesize empirical observations across sources"}},
+  {{"id": 4, "title": "Generate Grounded Executive Report & Knowledge Graph", "description": "Assemble final report with citations and concept graph"}}
 ]
 """
-                resp = self._client.models.generate_content(
+                resp = self._client.interactions.create(
                     model="gemini-3.8-flash",
-                    contents=prompt
+                    input=prompt
                 )
-                text = resp.text.strip()
-                # Extract JSON array
+                text = (resp.output_text or "").strip()
                 start = text.find("[")
                 end = text.rfind("]") + 1
                 if start != -1 and end != 0:
@@ -81,8 +143,8 @@ Example:
             except Exception as e:
                 print(f"[GeminiClient] Fallback to deterministic planner due to: {e}")
 
-        # High-utility deterministic plan
-        steps = [
+        # Deterministic plan
+        return [
             PlanStep(
                 id=1,
                 title="Deconstruct Query & Query Vector Store",
@@ -104,7 +166,6 @@ Example:
                 description="Construct executive brief, key findings with grounded citations [1], and interactive entity relationships."
             )
         ]
-        return steps
 
     def synthesize_final_report(
         self,
@@ -129,12 +190,12 @@ Available Citations:
 Write a comprehensive, professional research report.
 Output STRICTLY a valid JSON object matching this schema:
 {{
-  "executive_summary": "2-3 dense analytical paragraphs...",
+  "executive_summary": "2-3 dense analytical paragraphs synthesizing findings...",
   "key_findings": [
     {{
       "heading": "Finding Title",
       "content": "Detailed explanation citing sources using [1], [2]...",
-      "key_takeaway": "One sentence summary",
+      "key_takeaway": "One sentence key takeaway",
       "citations": [1]
     }}
   ],
@@ -146,7 +207,8 @@ Output STRICTLY a valid JSON object matching this schema:
   "strategic_implications": ["Actionable implication 1", "Actionable implication 2", "Actionable implication 3"],
   "knowledge_graph": {{
     "nodes": [
-      {{"id": "n1", "label": "Topic Core", "category": "Core Focus", "importance": 1.5}}
+      {{"id": "n1", "label": "Topic Core", "category": "Core Focus", "importance": 1.5}},
+      {{"id": "n2", "label": "Key Concept", "category": "Insight Area", "importance": 1.2}}
     ],
     "edges": [
       {{"source": "n1", "target": "n2", "relationship": "drives"}}
@@ -154,11 +216,11 @@ Output STRICTLY a valid JSON object matching this schema:
   }}
 }}
 """
-                resp = self._client.models.generate_content(
+                resp = self._client.interactions.create(
                     model="gemini-3.8-flash",
-                    contents=prompt
+                    input=prompt
                 )
-                text = resp.text.strip()
+                text = (resp.output_text or "").strip()
                 start = text.find("{")
                 end = text.rfind("}") + 1
                 if start != -1 and end != 0:
@@ -184,7 +246,6 @@ Output STRICTLY a valid JSON object matching this schema:
             except Exception as e:
                 print(f"[GeminiClient] Gemini synthesis error: {e}. Using fallback synthesizer.")
 
-        # Fallback high-fidelity structured report generator
         return self._generate_fallback_report(query, observations, citations, depth)
 
     def _generate_fallback_report(
@@ -194,7 +255,6 @@ Output STRICTLY a valid JSON object matching this schema:
         citations: List[Citation],
         depth: str
     ) -> ResearchReport:
-        # Extract keywords and substantive context from citations and observations
         doc_citations = [c for c in citations if c.source_type == "document"]
         web_citations = [c for c in citations if c.source_type == "web"]
 
@@ -209,7 +269,7 @@ Output STRICTLY a valid JSON object matching this schema:
         )
 
         findings = []
-        c1_ids = [c.id for c in citations[:2]]
+        c1_ids = [c.id for c in citations[:2]] or [1]
         c2_ids = [c.id for c in citations[2:4]] or c1_ids
 
         findings.append(Finding(
@@ -252,7 +312,6 @@ Output STRICTLY a valid JSON object matching this schema:
             "Standardize on structured JSON schemas (e.g. Pydantic models) to eliminate schema drift across agent toolchains."
         ]
 
-        # Build dynamic knowledge graph
         nodes = [
             KnowledgeNode(id="core", label=query[:24], category="Core Objective", importance=2.0),
             KnowledgeNode(id="rag", label="Vector RAG", category="Infrastructure", importance=1.4),

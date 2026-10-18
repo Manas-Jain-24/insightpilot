@@ -12,7 +12,7 @@ from backend.agent.gemini_client import GeminiClient
 
 
 class ResearchOrchestrator:
-    """Autonomous ReAct Research Agent Orchestrator with live event streaming."""
+    """Autonomous ReAct Research Agent Orchestrator with live event streaming and Gemini function calling."""
 
     def __init__(self, vector_store: VectorStore, gemini_client: GeminiClient):
         self.vector_store = vector_store
@@ -40,135 +40,234 @@ class ResearchOrchestrator:
             "event": "status",
             "data": {"message": "Deconstructing research topic into structured execution plan..."}
         }
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(0.3)
 
         plan = self.gemini_client.plan_research(query, doc_names, depth=request.depth)
         yield {
             "event": "plan",
             "data": [p.model_dump() for p in plan]
         }
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.4)
 
         citations: List[Citation] = []
         observations: List[Dict[str, Any]] = []
         citation_id_counter = 1
 
-        # 3. Step 1: Document Retrieval (Vector RAG)
-        step1 = plan[0]
-        yield {"event": "step_start", "data": {"step_id": step1.id}}
-        await asyncio.sleep(0.3)
+        # Check if we can run true autonomous Gemini function calling
+        if self.gemini_client.has_api_key():
+            try:
+                step1 = plan[0]
+                yield {"event": "step_start", "data": {"step_id": step1.id}}
 
-        thought1 = f"I should first query the local vector store for semantic matches regarding '{query}' to identify primary source material."
-        yield {"event": "thought", "data": {"step_id": step1.id, "thought": thought1}}
-        await asyncio.sleep(0.4)
+                system_prompt = (
+                    f"You are InsightPilot, an autonomous research agent investigating: '{query}'. "
+                    f"Available tools: search_documents (for user uploaded files) and search_web (for live facts). "
+                    f"Use these tools to gather facts before synthesizing a final answer."
+                )
 
-        tool_input1 = {"query": query, "top_k": 3, "filter_doc_ids": doc_ids if doc_ids else None}
-        yield {"event": "action", "data": {"step_id": step1.id, "tool_name": "document_retrieval", "input": tool_input1}}
+                interaction = self.gemini_client.create_interaction(
+                    input_data=system_prompt,
+                    tools=self.gemini_client.get_registered_tools()
+                )
 
-        # Execute Document Retrieval
-        t0 = time.time()
-        doc_result = self.doc_tool.execute(query=query, top_k=3, filter_doc_ids=doc_ids if doc_ids else None)
-        latency1 = round((time.time() - t0) * 1000, 1)
+                turn = 0
+                max_turns = 4
+                current_step_id = 1
 
-        obs_summary1 = f"Retrieved {doc_result['found']} relevant document chunks from ingested repository."
-        yield {
-            "event": "observation",
-            "data": {"step_id": step1.id, "observation": obs_summary1, "chunks_found": doc_result['found'], "latency_ms": latency1}
-        }
+                while interaction and turn < max_turns:
+                    turn += 1
+                    steps = interaction.steps or []
+                    has_tool_call = False
 
-        # Build Citations from document chunks
-        for chunk_data in doc_result.get("chunks", []):
-            cite = Citation(
-                id=citation_id_counter,
-                source_type="document",
-                title=f"{chunk_data['doc_name']} (Page {chunk_data['page'] or 1})",
-                snippet=chunk_data["content"][:240] + "...",
-                relevance_score=chunk_data["similarity"],
-                url_or_page=f"Page {chunk_data['page']}" if chunk_data.get('page') else "Document Chunk"
-            )
-            citations.append(cite)
-            yield {"event": "citation_added", "data": cite.model_dump()}
-            citation_id_counter += 1
+                    for step in steps:
+                        # If model emitted internal reasoning
+                        if step.type == "thought":
+                            thought_text = getattr(step, "summary", "") or "Evaluating evidence and deciding next action."
+                            yield {
+                                "event": "thought",
+                                "data": {"step_id": current_step_id, "thought": thought_text}
+                            }
+                            await asyncio.sleep(0.3)
 
-        observations.append({"step": 1, "tool": "document_retrieval", "data": doc_result})
-        yield {"event": "step_complete", "data": {"step_id": step1.id}}
-        await asyncio.sleep(0.4)
+                        elif step.type == "function_call":
+                            has_tool_call = True
+                            tool_name = step.name
+                            args = step.arguments or {}
 
-        # 4. Step 2: Web Search Tool
-        step2 = plan[1] if len(plan) > 1 else plan[0]
-        yield {"event": "step_start", "data": {"step_id": step2.id}}
-        await asyncio.sleep(0.3)
+                            # Map plan step status
+                            if current_step_id <= len(plan):
+                                yield {"event": "step_start", "data": {"step_id": current_step_id}}
 
-        thought2 = f"Now checking external web sources and state-of-the-art benchmarks to ground internal findings against broader industry standards."
-        yield {"event": "thought", "data": {"step_id": step2.id, "thought": thought2}}
-        await asyncio.sleep(0.4)
+                            yield {
+                                "event": "action",
+                                "data": {
+                                    "step_id": current_step_id,
+                                    "tool_name": tool_name,
+                                    "input": args
+                                }
+                            }
 
-        tool_input2 = {"query": query, "num_results": 3}
-        yield {"event": "action", "data": {"step_id": step2.id, "tool_name": "web_search", "input": tool_input2}}
+                            t0 = time.time()
+                            tool_result_str = ""
 
-        t0 = time.time()
-        web_result = await self.web_tool.execute_async(query=query, num_results=3)
-        latency2 = round((time.time() - t0) * 1000, 1)
+                            if tool_name == "search_documents":
+                                q = args.get("query", query)
+                                top_k = args.get("top_k", 3)
+                                doc_res = self.doc_tool.execute(query=q, top_k=top_k, filter_doc_ids=doc_ids if doc_ids else None)
+                                latency = round((time.time() - t0) * 1000, 1)
 
-        web_items = web_result.get("results", [])
-        obs_summary2 = f"Retrieved {len(web_items)} external publications and benchmark references."
-        yield {
-            "event": "observation",
-            "data": {"step_id": step2.id, "observation": obs_summary2, "results_found": len(web_items), "latency_ms": latency2}
-        }
+                                for chunk_data in doc_res.get("chunks", []):
+                                    cite = Citation(
+                                        id=citation_id_counter,
+                                        source_type="document",
+                                        title=f"{chunk_data['doc_name']} (Page {chunk_data['page'] or 1})",
+                                        snippet=chunk_data["content"][:240] + "...",
+                                        relevance_score=chunk_data["similarity"],
+                                        url_or_page=f"Page {chunk_data['page']}" if chunk_data.get('page') else "Document Chunk"
+                                    )
+                                    citations.append(cite)
+                                    yield {"event": "citation_added", "data": cite.model_dump()}
+                                    citation_id_counter += 1
 
-        for w in web_items:
-            cite = Citation(
-                id=citation_id_counter,
-                source_type="web",
-                title=w["title"],
-                snippet=w["snippet"][:240] + "...",
-                relevance_score=0.91,
-                url_or_page=w["url"]
-            )
-            citations.append(cite)
-            yield {"event": "citation_added", "data": cite.model_dump()}
-            citation_id_counter += 1
+                                obs_summary = f"Retrieved {doc_res['found']} relevant document chunks from ingested repository."
+                                yield {
+                                    "event": "observation",
+                                    "data": {"step_id": current_step_id, "observation": obs_summary, "latency_ms": latency}
+                                }
+                                observations.append({"tool": tool_name, "data": doc_res})
+                                tool_result_str = str(doc_res)
 
-        observations.append({"step": 2, "tool": "web_search", "data": web_result})
-        yield {"event": "step_complete", "data": {"step_id": step2.id}}
-        await asyncio.sleep(0.4)
+                            elif tool_name == "search_web":
+                                q = args.get("query", query)
+                                num = args.get("num_results", 3)
+                                web_res = await self.web_tool.execute_async(query=q, num_results=num)
+                                latency = round((time.time() - t0) * 1000, 1)
 
-        # 5. Step 3: Synthesis & Verification
-        step3 = plan[2] if len(plan) > 2 else plan[-1]
-        yield {"event": "step_start", "data": {"step_id": step3.id}}
-        await asyncio.sleep(0.3)
+                                for w in web_res.get("results", []):
+                                    cite = Citation(
+                                        id=citation_id_counter,
+                                        source_type="web",
+                                        title=w["title"],
+                                        snippet=w["snippet"][:240] + "...",
+                                        relevance_score=0.91,
+                                        url_or_page=w["url"]
+                                    )
+                                    citations.append(cite)
+                                    yield {"event": "citation_added", "data": cite.model_dump()}
+                                    citation_id_counter += 1
 
-        thought3 = "Synthesizing cross-source evidence, evaluating operational trade-offs, and compiling quantitative comparisons."
-        yield {"event": "thought", "data": {"step_id": step3.id, "thought": thought3}}
-        await asyncio.sleep(0.4)
+                                obs_summary = f"Retrieved {len(web_res.get('results', []))} external publications and benchmark references."
+                                yield {
+                                    "event": "observation",
+                                    "data": {"step_id": current_step_id, "observation": obs_summary, "latency_ms": latency}
+                                }
+                                observations.append({"tool": tool_name, "data": web_res})
+                                tool_result_str = str(web_res)
 
-        tool_input3 = {"metrics": ["Accuracy", "Latency", "Cost Efficiency"]}
-        yield {"event": "action", "data": {"step_id": step3.id, "tool_name": "data_synthesis", "input": tool_input3}}
+                            yield {"event": "step_complete", "data": {"step_id": current_step_id}}
+                            current_step_id = min(current_step_id + 1, len(plan))
+                            await asyncio.sleep(0.3)
 
-        t0 = time.time()
-        synth_res = self.synth_tool.execute(
-            findings=[f"Source {c.title}" for c in citations],
-            metrics_to_compare=["Operational Latency", "Precision Threshold", "Implementation Complexity"]
-        )
-        latency3 = round((time.time() - t0) * 1000, 1)
+                            # Send tool execution result back to Gemini
+                            interaction = self.gemini_client.create_interaction(
+                                previous_interaction_id=interaction.id,
+                                input_data=[{
+                                    "type": "function_result",
+                                    "name": step.name,
+                                    "call_id": step.id,
+                                    "result": tool_result_str
+                                }]
+                            )
 
-        yield {
-            "event": "observation",
-            "data": {"step_id": step3.id, "observation": "Calculated cross-dimensional tradeoff matrix with high consistency confidence.", "latency_ms": latency3}
-        }
-        observations.append({"step": 3, "tool": "data_synthesis", "data": synth_res})
-        yield {"event": "step_complete", "data": {"step_id": step3.id}}
-        await asyncio.sleep(0.4)
+                    # If model didn't ask for any more tools, it is ready to synthesize
+                    if not has_tool_call:
+                        break
 
-        # 6. Step 4: Final Executive Report Generation
-        step4 = plan[3] if len(plan) > 3 else plan[-1]
-        yield {"event": "step_start", "data": {"step_id": step4.id}}
+            except Exception as e:
+                print(f"[ResearchOrchestrator] Dynamic interaction error: {e}. Falling back to guided execution.")
+                # We will fall through to ensure citations and final report are synthesized reliably
+
+        # If citations were empty (fallback), ensure we perform baseline retrieval
+        if not citations:
+            step1 = plan[0]
+            yield {"event": "step_start", "data": {"step_id": step1.id}}
+            yield {
+                "event": "thought",
+                "data": {"step_id": step1.id, "thought": f"Querying vector database for primary source documentation regarding '{query}'."}
+            }
+            t0 = time.time()
+            doc_result = self.doc_tool.execute(query=query, top_k=3, filter_doc_ids=doc_ids if doc_ids else None)
+            latency1 = round((time.time() - t0) * 1000, 1)
+
+            yield {
+                "event": "action",
+                "data": {"step_id": step1.id, "tool_name": "document_retrieval", "input": {"query": query, "top_k": 3}}
+            }
+            yield {
+                "event": "observation",
+                "data": {"step_id": step1.id, "observation": f"Retrieved {doc_result['found']} excerpts from vector store.", "latency_ms": latency1}
+            }
+            for chunk_data in doc_result.get("chunks", []):
+                cite = Citation(
+                    id=citation_id_counter,
+                    source_type="document",
+                    title=f"{chunk_data['doc_name']} (Page {chunk_data['page'] or 1})",
+                    snippet=chunk_data["content"][:240] + "...",
+                    relevance_score=chunk_data["similarity"],
+                    url_or_page=f"Page {chunk_data['page']}" if chunk_data.get('page') else "Document Chunk"
+                )
+                citations.append(cite)
+                yield {"event": "citation_added", "data": cite.model_dump()}
+                citation_id_counter += 1
+
+            observations.append({"tool": "document_retrieval", "data": doc_result})
+            yield {"event": "step_complete", "data": {"step_id": step1.id}}
+            await asyncio.sleep(0.3)
+
+            # Web search baseline
+            step2 = plan[1] if len(plan) > 1 else plan[0]
+            yield {"event": "step_start", "data": {"step_id": step2.id}}
+            yield {
+                "event": "thought",
+                "data": {"step_id": step2.id, "thought": "Gathering live web intelligence and cross-referencing benchmarks."}
+            }
+            t0 = time.time()
+            web_result = await self.web_tool.execute_async(query=query, num_results=3)
+            latency2 = round((time.time() - t0) * 1000, 1)
+
+            yield {
+                "event": "action",
+                "data": {"step_id": step2.id, "tool_name": "web_search", "input": {"query": query, "num_results": 3}}
+            }
+            yield {
+                "event": "observation",
+                "data": {"step_id": step2.id, "observation": f"Retrieved {len(web_result.get('results', []))} benchmark sources.", "latency_ms": latency2}
+            }
+            for w in web_result.get("results", []):
+                cite = Citation(
+                    id=citation_id_counter,
+                    source_type="web",
+                    title=w["title"],
+                    snippet=w["snippet"][:240] + "...",
+                    relevance_score=0.91,
+                    url_or_page=w["url"]
+                )
+                citations.append(cite)
+                yield {"event": "citation_added", "data": cite.model_dump()}
+                citation_id_counter += 1
+
+            observations.append({"tool": "web_search", "data": web_result})
+            yield {"event": "step_complete", "data": {"step_id": step2.id}}
+            await asyncio.sleep(0.3)
+
+        # Final Synthesis Phase
+        final_step = plan[-1]
+        yield {"event": "step_start", "data": {"step_id": final_step.id}}
         yield {
             "event": "thought",
-            "data": {"step_id": step4.id, "thought": "Assembling verified citations into final multi-section research intelligence report and knowledge graph."}
+            "data": {"step_id": final_step.id, "thought": "Synthesizing cross-source evidence into grounded executive brief with comparative matrix and concept graph."}
         }
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.4)
 
         report = self.gemini_client.synthesize_final_report(
             query=query,
@@ -180,11 +279,12 @@ class ResearchOrchestrator:
         total_elapsed = round(time.time() - start_time, 2)
         report.metrics["total_duration_seconds"] = total_elapsed
         report.metrics["citations_count"] = len(citations)
-        report.metrics["sources_analyzed"] = len(doc_result.get("chunks", [])) + len(web_items)
 
-        yield {"event": "step_complete", "data": {"step_id": step4.id}}
+        # Mark all steps completed
+        for p in plan:
+            yield {"event": "step_complete", "data": {"step_id": p.id}}
+
         yield {"event": "report", "data": report.model_dump()}
-
         yield {
             "event": "done",
             "data": {
