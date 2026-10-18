@@ -79,5 +79,49 @@ class TestInsightPilot(unittest.TestCase):
         asyncio.run(run_stream())
 
 
+    def test_database_persistence(self):
+        import tempfile
+        from backend.db.database import Database
+        from backend.models import ResearchReport, Finding, Citation
+
+        temp_db_file = os.path.join(tempfile.gettempdir(), "test_insightpilot.db")
+        if os.path.exists(temp_db_file):
+            os.remove(temp_db_file)
+
+        test_db = Database(db_path=temp_db_file)
+        sample_report = ResearchReport(
+            id="test_rep_1",
+            query="Test Quantum Query",
+            depth="quick",
+            executive_summary="This is a test summary for SQLite persistence.",
+            key_findings=[Finding(heading="Test Heading", content="Test Content", citations=[1])],
+            citations=[Citation(id=1, source_type="document", title="Sample Doc", snippet="Sample snippet")]
+        )
+
+        # Save
+        test_db.save_report(sample_report)
+
+        # List
+        reports = test_db.list_reports()
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(reports[0]["id"], "test_rep_1")
+        self.assertEqual(reports[0]["query"], "Test Quantum Query")
+
+        # Get
+        retrieved = test_db.get_report("test_rep_1")
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.query, "Test Quantum Query")
+        self.assertEqual(len(retrieved.key_findings), 1)
+
+        # Delete
+        deleted = test_db.delete_report("test_rep_1")
+        self.assertTrue(deleted)
+        self.assertEqual(len(test_db.list_reports()), 0)
+
+        # Clean up
+        if os.path.exists(temp_db_file):
+            os.remove(temp_db_file)
+
+
 if __name__ == "__main__":
     unittest.main()

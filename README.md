@@ -84,6 +84,8 @@ Unlike conventional single-turn LLM chatbots that hallucinate citations and suff
   - Multi-format ingestion (`.pdf`, `.md`, `.txt`, `.json`, `.csv`) with recursive sliding-window chunking and sentence boundary preservation.
   - Cosine vector similarity search with semantic keyword boost and page-level source tracking.
 - **Strict Citation Grounding**: Eliminates hallucinations by anchoring every finding to verified document excerpts or web citations with relevance scores.
+- **Persistent SQLite Storage & Session History**: Auto-saves research briefs to local SQLite with a responsive History Drawer for 1-click reload, search, and deletion across restarts.
+- **Live Multi-Source Web Crawling**: Dynamically queries DuckDuckGo and Wikipedia APIs for real-time external benchmarks and current events.
 - **Real-Time SSE Streaming**: Async generator architecture streaming incremental thoughts, tool latency, and final report JSON to the client.
 - **Dual-Mode Engine (Production + Demo)**:
   - *Live Mode*: Direct integration with Google's `gemini-3.8-flash` via the official `google-genai` SDK.

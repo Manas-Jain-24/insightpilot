@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from backend.rag.vector_store import VectorStore
 from backend.rag.document_loader import DocumentLoader
 from backend.agent.gemini_client import GeminiClient
+from backend.db.database import Database
 from backend.api.routes import create_router
 
 # Load environment variables
@@ -26,6 +27,7 @@ load_dotenv()
 vector_store = VectorStore()
 gemini_client = GeminiClient()
 vector_store.gemini_client = gemini_client
+db = Database()
 
 
 def seed_sample_data():
@@ -71,7 +73,7 @@ app.add_middleware(
 )
 
 # Attach API routes
-api_router = create_router(vector_store, gemini_client)
+api_router = create_router(vector_store, gemini_client, db=db)
 app.include_router(api_router, prefix="/api")
 
 # Static files setup

@@ -11,12 +11,16 @@ from backend.agent.tools import (
 from backend.agent.gemini_client import GeminiClient
 
 
+from backend.db.database import Database
+
+
 class ResearchOrchestrator:
     """Autonomous ReAct Research Agent Orchestrator with live event streaming and Gemini function calling."""
 
-    def __init__(self, vector_store: VectorStore, gemini_client: GeminiClient):
+    def __init__(self, vector_store: VectorStore, gemini_client: GeminiClient, db: Optional[Database] = None):
         self.vector_store = vector_store
         self.gemini_client = gemini_client
+        self.db = db
         self.doc_tool = DocumentRetrievalTool(vector_store)
         self.web_tool = WebSearchTool()
         self.synth_tool = DataSynthesisTool()
@@ -280,9 +284,12 @@ class ResearchOrchestrator:
         report.metrics["total_duration_seconds"] = total_elapsed
         report.metrics["citations_count"] = len(citations)
 
-        # Mark all steps completed
-        for p in plan:
-            yield {"event": "step_complete", "data": {"step_id": p.id}}
+        # Auto-save report to SQLite database
+        if self.db:
+            try:
+                self.db.save_report(report)
+            except Exception as e:
+                print(f"[ResearchOrchestrator] Failed to auto-save report to DB: {e}")
 
         yield {"event": "report", "data": report.model_dump()}
         yield {

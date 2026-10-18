@@ -46,13 +46,18 @@ const kgCanvas = document.getElementById("kgCanvas");
 const docsModal = document.getElementById("docsModal");
 const settingsModal = document.getElementById("settingsModal");
 const citationModal = document.getElementById("citationModal");
+const historyModal = document.getElementById("historyModal");
 const btnOpenDocs = document.getElementById("btnOpenDocs");
 const btnCloseDocs = document.getElementById("btnCloseDocs");
 const btnOpenSettings = document.getElementById("btnOpenSettings");
 const btnCloseSettings = document.getElementById("btnCloseSettings");
 const btnCloseCitation = document.getElementById("btnCloseCitation");
+const btnOpenHistory = document.getElementById("btnOpenHistory");
+const btnCloseHistory = document.getElementById("btnCloseHistory");
 const docsCountPill = document.getElementById("docsCountPill");
 const docsListContainer = document.getElementById("docsListContainer");
+const historyCountPill = document.getElementById("historyCountPill");
+const historyListContainer = document.getElementById("historyListContainer");
 const fileDropzone = document.getElementById("fileDropzone");
 const fileInput = document.getElementById("fileInput");
 const apiKeyInput = document.getElementById("apiKeyInput");
@@ -63,6 +68,7 @@ const btnPrintReport = document.getElementById("btnPrintReport");
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", () => {
   loadDocuments();
+  loadHistory();
   setupEventListeners();
   loadSavedApiKey();
 });
@@ -94,12 +100,18 @@ function setupEventListeners() {
   });
   btnCloseDocs.addEventListener("click", () => docsModal.classList.remove("open"));
 
+  btnOpenHistory.addEventListener("click", () => {
+    historyModal.classList.add("open");
+    loadHistory();
+  });
+  btnCloseHistory.addEventListener("click", () => historyModal.classList.remove("open"));
+
   btnOpenSettings.addEventListener("click", () => settingsModal.classList.add("open"));
   btnCloseSettings.addEventListener("click", () => settingsModal.classList.remove("open"));
   btnCloseCitation.addEventListener("click", () => citationModal.classList.remove("open"));
 
   // Close modals on backdrop click
-  [docsModal, settingsModal, citationModal].forEach(modal => {
+  [docsModal, settingsModal, citationModal, historyModal].forEach(modal => {
     modal.addEventListener("click", (e) => {
       if (e.target === modal) modal.classList.remove("open");
     });
@@ -347,6 +359,7 @@ function handleStreamEvent(eventObj) {
 
     case "done":
       addTraceLog("observation", "Synthesis Complete", `Report generated in ${data.elapsed_seconds}s with ${data.total_citations} grounded citations.`);
+      loadHistory();
       break;
 
     case "error":
@@ -657,3 +670,85 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+// ---------------- Research History (SQLite) ----------------
+async function loadHistory() {
+  try {
+    const res = await fetch("/api/reports");
+    if (!res.ok) return;
+    const reports = await res.json();
+    if (historyCountPill) historyCountPill.textContent = reports.length;
+
+    if (!historyListContainer) return;
+    if (reports.length === 0) {
+      historyListContainer.innerHTML = '<div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 2rem 0;">No saved research reports yet. Launch a research query to auto-save reports to SQLite.</div>';
+      return;
+    }
+
+    historyListContainer.innerHTML = reports.map(r => {
+      const dateStr = new Date(r.created_at * 1000).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+      return `
+        <div class="history-item">
+          <div class="history-main">
+            <div class="history-title" title="${escapeHtml(r.query)}">${escapeHtml(r.query)}</div>
+            <div class="history-meta">
+              <span>${dateStr}</span>
+              <span>•</span>
+              <span class="status-badge" style="padding: 0.15rem 0.5rem; font-size: 0.7rem;">${r.model || 'Gemini 3.8 Flash'}</span>
+              <span>•</span>
+              <span>${r.citations_count} Citations</span>
+              <span>•</span>
+              <span style="text-transform: capitalize;">${r.depth}</span>
+            </div>
+          </div>
+          <div class="history-actions">
+            <button class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;" onclick="loadReportById('${r.id}')">
+              View Report
+            </button>
+            <button class="delete-file-btn" style="padding: 0.4rem; font-size: 0.9rem;" onclick="deleteReportById('${r.id}')" title="Delete from SQLite">
+              🗑️
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    console.error("Error loading history:", err);
+  }
+}
+
+window.loadReportById = async function(reportId) {
+  try {
+    const res = await fetch(`/api/reports/${reportId}`);
+    if (!res.ok) {
+      alert("Could not load report from SQLite");
+      return;
+    }
+    const report = await res.json();
+    currentReport = report;
+    renderReport(report);
+    historyModal.classList.remove("open");
+
+    // Scroll to report view
+    if (reportPanel) {
+      reportPanel.scrollIntoView({ behavior: 'smooth' });
+    }
+  } catch (err) {
+    alert(`Error loading report: ${err.message}`);
+  }
+};
+
+window.deleteReportById = async function(reportId) {
+  if (!confirm("Are you sure you want to delete this saved report from SQLite?")) return;
+  try {
+    const res = await fetch(`/api/reports/${reportId}`, { method: "DELETE" });
+    if (res.ok) {
+      loadHistory();
+    }
+  } catch (err) {
+    console.error("Delete report error:", err);
+  }
+};
+

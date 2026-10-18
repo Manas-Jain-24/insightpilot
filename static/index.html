@@ -35,6 +35,10 @@
         📁 Ingested Docs (<span id="docsCountPill">0</span>)
       </button>
 
+      <button class="btn btn-secondary" id="btnOpenHistory" title="View Saved Research Reports">
+        📜 History (<span id="historyCountPill">0</span>)
+      </button>
+
       <button class="btn btn-secondary" id="btnOpenSettings" title="Configure Gemini API or Simulation Mode">
         ⚙️ Settings
       </button>
@@ -308,6 +312,22 @@
         <button class="close-btn" id="btnCloseCitation">&times;</button>
       </div>
       <div id="citationModalBody"></div>
+    </div>
+  </div>
+
+  <!-- Research History Modal -->
+  <div class="modal-backdrop" id="historyModal">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3>📜 Research Intelligence History (SQLite)</h3>
+        <button class="close-btn" id="btnCloseHistory">&times;</button>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+        Reports are auto-saved to SQLite. Click any report to reload its findings, citations, and knowledge graph.
+      </p>
+      <div class="file-list" id="historyListContainer">
+        <div style="font-size: 0.85rem; color: var(--text-muted);">Loading past reports...</div>
+      </div>
     </div>
   </div>
 
