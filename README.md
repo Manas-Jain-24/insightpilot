@@ -98,7 +98,7 @@ Unlike conventional single-turn LLM chatbots that hallucinate citations and suff
 ### 1. Clone & Set Up Virtual Environment
 
 ```bash
-git clone https://github.com/your-username/insightpilot.git
+git clone https://github.com/Manas-Jain-24/insightpilot.git
 cd insightpilot
 
 # Create virtual environment

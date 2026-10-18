@@ -101,7 +101,7 @@ Live demo running locally at http://127.0.0.1:8080.
 3. Push your code:
    ```bash
    git branch -M main
-   git remote add origin https://github.com/YOUR_GITHUB_USERNAME/insightpilot.git
+   git remote add origin https://github.com/Manas-Jain-24/insightpilot.git
    git push -u origin main
    ```
 4. Pin the repository to your GitHub profile!
