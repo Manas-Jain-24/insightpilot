@@ -450,7 +450,8 @@ function renderReport(report) {
   reportTimestamp.textContent = new Date((report.created_at || Date.now() / 1000) * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   reportDuration.textContent = report.metrics?.total_duration_seconds != null ? `${report.metrics.total_duration_seconds}s` : "—";
   reportCitationsCount.textContent = `${report.citations?.length || 0} Citations`;
-  reportModelBadge.textContent = report.metrics?.model || report.metrics?.mode || "Evidence report";
+  const reportModeLabels = { extractive_fallback: "Source excerpts", no_evidence: "No evidence", verified_quotes: "Verified quotes" };
+  reportModelBadge.textContent = report.metrics?.model || reportModeLabels[report.metrics?.mode] || "Evidence report";
 
   // Executive summary
   execSummaryContent.innerHTML = formatMarkdownWithCitations(report.executive_summary);

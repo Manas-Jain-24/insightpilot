@@ -157,7 +157,7 @@ class ResearchOrchestrator:
                                         id=citation_id_counter,
                                         source_type="web",
                                         title=w["title"],
-                                        snippet=w["snippet"][:240] + "...",
+                                        snippet=w["snippet"][:500] + ("..." if len(w["snippet"]) > 500 else ""),
                                         relevance_score=0.0,
                                         url_or_page=w["url"]
                                     )
@@ -165,7 +165,8 @@ class ResearchOrchestrator:
                                     yield {"event": "citation_added", "data": cite.model_dump()}
                                     citation_id_counter += 1
 
-                                obs_summary = f"Retrieved {len(web_res.get('results', []))} external publications and benchmark references."
+                                web_count = len(web_res.get("results", []))
+                                obs_summary = f"Retrieved {web_count} relevant web {'source' if web_count == 1 else 'sources'}."
                                 yield {
                                     "event": "observation",
                                     "data": {"step_id": current_step_id, "observation": obs_summary, "latency_ms": latency}
@@ -247,7 +248,7 @@ class ResearchOrchestrator:
                 yield {"event": "step_start", "data": {"step_id": step2.id}}
                 yield {
                     "event": "thought",
-                    "data": {"step_id": step2.id, "thought": "Gathering live web intelligence and cross-referencing benchmarks."}
+                    "data": {"step_id": step2.id, "thought": "Searching the web for sources relevant to the question."}
                 }
                 t0 = time.time()
                 web_result = await self.web_tool.execute_async(query=query, num_results=3)
@@ -259,14 +260,14 @@ class ResearchOrchestrator:
                 }
                 yield {
                     "event": "observation",
-                    "data": {"step_id": step2.id, "observation": f"Retrieved {len(web_result.get('results', []))} benchmark sources.", "latency_ms": latency2}
+                    "data": {"step_id": step2.id, "observation": f"Retrieved {len(web_result.get('results', []))} relevant web {'source' if len(web_result.get('results', [])) == 1 else 'sources'}.", "latency_ms": latency2}
                 }
                 for w in web_result.get("results", []):
                     cite = Citation(
                         id=citation_id_counter,
                         source_type="web",
                         title=w["title"],
-                        snippet=w["snippet"][:240] + "...",
+                        snippet=w["snippet"][:500] + ("..." if len(w["snippet"]) > 500 else ""),
                         relevance_score=0.0,
                         url_or_page=w["url"]
                     )

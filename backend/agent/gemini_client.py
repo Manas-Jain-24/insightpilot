@@ -158,8 +158,8 @@ Example:
             ),
             PlanStep(
                 id=2,
-                title="Gather Web Intelligence & Current State-of-the-Art",
-                description="Execute real-time queries across external literature, technical releases, and encyclopedic sources."
+                title="Search Web Sources",
+                description="Look for sources that match the question."
             ),
             PlanStep(
                 id=3,
@@ -278,6 +278,11 @@ Return an empty list if none qualify.
                 metrics={"mode": "no_evidence"}
             )
 
+        first_source = citations[0]
+        first_excerpt = first_source.snippet.removesuffix("...").strip()
+        first_sentence = re.split(r"(?<=[.!?])\s+", first_excerpt, maxsplit=1)[0]
+        if len(first_sentence) < 40:
+            first_sentence = first_excerpt
         findings = [Finding(
             heading=c.title,
             content=f"{c.snippet} [{c.id}]",
@@ -285,7 +290,7 @@ Return an empty list if none qualify.
         ) for c in citations[:5]]
         return ResearchReport(
             query=query, depth=depth,
-            executive_summary=f"Found {len(citations)} source excerpt(s) for '{query}'. The excerpts below are provided without additional inferred claims.",
+            executive_summary=f"{first_sentence} [{first_source.id}]",
             key_findings=findings,
             citations=citations,
             metrics={"mode": "extractive_fallback"}

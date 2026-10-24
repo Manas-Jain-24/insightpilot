@@ -62,6 +62,49 @@ class TestInsightPilot(unittest.TestCase):
 
         asyncio.run(run_test())
 
+    def test_web_search_ranks_relevant_page_and_rejects_unrelated_results(self):
+        def respond(request):
+            if "duckduckgo.com" in request.url.host:
+                return httpx.Response(200, json={"AbstractText": "", "RelatedTopics": []})
+            self.assertNotIn("find about", request.url.params["gsrsearch"].lower())
+            return httpx.Response(200, json={"query": {"pages": {
+                "3": {"index": 3, "title": "Gag order", "extract": "A court order restricting speech."},
+                "2": {"index": 2, "title": "Big Brother 17", "extract": "A television season."},
+                "1": {"index": 1, "title": "Heckler's veto", "extract":
+                      "A heckler's veto occurs when a hostile audience prevents a speaker from being heard."},
+            }}})
+
+        transport = httpx.MockTransport(respond)
+        original_client = httpx.AsyncClient
+
+        async def run_test():
+            with patch("backend.agent.tools.httpx.AsyncClient",
+                       side_effect=lambda *a, **kw: original_client(transport=transport, **kw)):
+                result = await WebSearchTool().execute_async("Find about hecklers veto", num_results=3)
+            self.assertEqual([item["title"] for item in result["results"]], ["Heckler's veto"])
+
+        asyncio.run(run_test())
+
+    def test_web_search_abstains_when_results_are_off_topic(self):
+        def respond(request):
+            if "duckduckgo.com" in request.url.host:
+                return httpx.Response(200, json={"AbstractText": "", "RelatedTopics": []})
+            return httpx.Response(200, json={"query": {"pages": {
+                "1": {"index": 1, "title": "Gag order", "extract": "A court order restricting speech."}
+            }}})
+
+        transport = httpx.MockTransport(respond)
+        original_client = httpx.AsyncClient
+
+        async def run_test():
+            with patch("backend.agent.tools.httpx.AsyncClient",
+                       side_effect=lambda *a, **kw: original_client(transport=transport, **kw)):
+                result = await WebSearchTool().execute_async("Find about hecklers veto")
+            self.assertEqual(result["results"], [])
+            self.assertEqual(result["source"], "unavailable")
+
+        asyncio.run(run_test())
+
     def test_web_failure_does_not_invent_sources(self):
         transport = httpx.MockTransport(lambda request: httpx.Response(503))
         original_client = httpx.AsyncClient
@@ -123,6 +166,7 @@ class TestInsightPilot(unittest.TestCase):
         report = client.synthesize_final_report("research result", [], [citation])
         self.assertEqual(report.metrics["mode"], "extractive_fallback")
         self.assertEqual(report.key_findings[0].citations, [1])
+        self.assertIn("A source excerpt describing a measured research result. [1]", report.executive_summary)
 
     def test_research_controls_disable_both_tools(self):
         async def run_test():
