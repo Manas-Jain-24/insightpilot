@@ -27,8 +27,11 @@ class Citation(BaseModel):
     source_type: Literal["document", "web"]
     title: str
     snippet: str
-    relevance_score: float = 0.95
+    relevance_score: float = 0.0
     url_or_page: Optional[str] = None
+    doc_id: Optional[str] = None
+    chunk_id: Optional[str] = None
+    page_number: Optional[int] = None
 
 
 class KnowledgeNode(BaseModel):

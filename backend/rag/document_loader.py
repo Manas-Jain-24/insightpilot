@@ -54,7 +54,7 @@ class DocumentLoader:
                 if text.strip():
                     pages.append((idx + 1, text))
         except Exception as e:
-            pages.append((1, f"Error extracting PDF: {str(e)}"))
+            raise ValueError("PDF text extraction failed") from e
         return pages
 
     def _clean_text(self, text: str) -> str:

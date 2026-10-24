@@ -64,6 +64,8 @@ const apiKeyInput = document.getElementById("apiKeyInput");
 const btnSaveSettings = document.getElementById("btnSaveSettings");
 const btnExportMarkdown = document.getElementById("btnExportMarkdown");
 const btnPrintReport = document.getElementById("btnPrintReport");
+const sourceModal = document.getElementById("sourceModal");
+const evaluationModal = document.getElementById("evaluationModal");
 
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", () => {
@@ -109,9 +111,15 @@ function setupEventListeners() {
   btnOpenSettings.addEventListener("click", () => settingsModal.classList.add("open"));
   btnCloseSettings.addEventListener("click", () => settingsModal.classList.remove("open"));
   btnCloseCitation.addEventListener("click", () => citationModal.classList.remove("open"));
+  document.getElementById("btnCloseSource").addEventListener("click", () => {
+    sourceModal.classList.remove("open");
+    document.getElementById("sourcePdfImage").removeAttribute("src");
+  });
+  document.getElementById("btnOpenEvaluation").addEventListener("click", openEvaluation);
+  document.getElementById("btnCloseEvaluation").addEventListener("click", () => evaluationModal.classList.remove("open"));
 
   // Close modals on backdrop click
-  [docsModal, settingsModal, citationModal, historyModal].forEach(modal => {
+  [docsModal, settingsModal, citationModal, historyModal, sourceModal, evaluationModal].forEach(modal => {
     modal.addEventListener("click", (e) => {
       if (e.target === modal) modal.classList.remove("open");
     });
@@ -140,7 +148,7 @@ function setupEventListeners() {
   // Save Settings
   btnSaveSettings.addEventListener("click", () => {
     const key = apiKeyInput.value.trim();
-    if (key) {
+    if (key && document.getElementById("rememberApiKey").checked) {
       localStorage.setItem("insightpilot_gemini_key", key);
     } else {
       localStorage.removeItem("insightpilot_gemini_key");
@@ -157,6 +165,7 @@ function loadSavedApiKey() {
   const savedKey = localStorage.getItem("insightpilot_gemini_key");
   if (savedKey) {
     apiKeyInput.value = savedKey;
+    document.getElementById("rememberApiKey").checked = true;
   }
 }
 
@@ -257,7 +266,7 @@ async function launchAgentResearch() {
   startTime = Date.now();
   startTimer();
 
-  const apiKey = localStorage.getItem("insightpilot_gemini_key") || "";
+  const apiKey = apiKeyInput.value.trim();
   const depth = depthSelect.value;
   const useDocs = checkUseDocs.checked;
   const useWeb = checkUseWeb.checked;
@@ -439,10 +448,10 @@ function renderReport(report) {
   reportContent.style.display = "block";
 
   reportHeaderTitle.textContent = report.query;
-  reportTimestamp.textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-  reportDuration.textContent = `${report.metrics?.total_duration_seconds || '2.4'}s`;
+  reportTimestamp.textContent = new Date((report.created_at || Date.now() / 1000) * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  reportDuration.textContent = report.metrics?.total_duration_seconds != null ? `${report.metrics.total_duration_seconds}s` : "—";
   reportCitationsCount.textContent = `${report.citations?.length || 0} Citations`;
-  reportModelBadge.textContent = report.metrics?.model || "Gemini 3.8 Flash";
+  reportModelBadge.textContent = report.metrics?.model || report.metrics?.mode || "Evidence report";
 
   // Executive summary
   execSummaryContent.innerHTML = formatMarkdownWithCitations(report.executive_summary);
@@ -486,9 +495,10 @@ function renderReport(report) {
       <h4>[${c.id}] ${escapeHtml(c.title)}</h4>
       <p>"${escapeHtml(c.snippet)}"</p>
       <div style="font-size: 0.72rem; color: var(--accent-cyan); margin-top: 0.35rem;">
-        Type: ${c.source_type.toUpperCase()} • Relevance Score: ${(c.relevance_score * 100).toFixed(0)}%
+        Type: ${c.source_type.toUpperCase()}${c.source_type === "document" ? ` • Query term match: ${(c.relevance_score * 100).toFixed(0)}%` : ""}
         ${c.url_or_page ? ` • Reference: ${escapeHtml(c.url_or_page)}` : ""}
       </div>
+      ${c.doc_id && c.chunk_id ? `<button class="btn btn-secondary source-open-btn" data-cite-id="${c.id}" style="margin-top: 0.65rem;">Open source</button>` : ""}
     </div>
   `).join("");
 
@@ -500,9 +510,17 @@ function renderReport(report) {
       showCitationModal(citeId);
     });
   });
+  document.querySelectorAll(".source-open-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      const cite = currentReport?.citations?.find(c => c.id === Number(button.dataset.citeId));
+      if (cite) openSourceViewer(cite);
+    });
+  });
 
   // Render Concept Knowledge Graph on Canvas
-  if (report.knowledge_graph) {
+  const graphSection = document.getElementById("knowledgeGraphSection");
+  if (graphSection) graphSection.style.display = report.knowledge_graph?.nodes?.length ? "block" : "none";
+  if (report.knowledge_graph?.nodes?.length) {
     renderKnowledgeGraph(report.knowledge_graph);
   }
 }
@@ -532,9 +550,7 @@ function showCitationModal(citeId) {
   modalBody.innerHTML = `
     <div style="margin-bottom: 1rem;">
       <span class="status-badge" style="display: inline-flex;">${cite.source_type.toUpperCase()} SOURCE</span>
-      <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;">
-        Relevance Score: ${(cite.relevance_score * 100).toFixed(1)}%
-      </span>
+      ${cite.source_type === "document" ? `<span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;">Query term match: ${(cite.relevance_score * 100).toFixed(0)}%</span>` : ""}
     </div>
     <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: var(--radius-sm); border-left: 3px solid var(--accent-cyan); font-style: italic; color: #e2e8f0; font-size: 0.92rem; line-height: 1.6; margin-bottom: 1rem;">
       "${escapeHtml(cite.snippet)}"
@@ -542,9 +558,89 @@ function showCitationModal(citeId) {
     <div style="font-size: 0.82rem; color: var(--text-muted);">
       <strong>Source Location:</strong> ${escapeHtml(cite.url_or_page || "Document Context")}
     </div>
+    ${cite.doc_id && cite.chunk_id ? `<button class="btn btn-primary" id="btnViewSource" style="margin-top: 1rem;">Open source</button>` : ""}
   `;
 
+  modalBody.querySelector("#btnViewSource")?.addEventListener("click", () => {
+    citationModal.classList.remove("open");
+    openSourceViewer(cite);
+  });
+
   citationModal.classList.add("open");
+}
+
+async function openSourceViewer(cite) {
+  const status = document.getElementById("sourceViewerStatus");
+  const textBox = document.getElementById("sourceViewerText");
+  const pdfPanel = document.getElementById("sourcePdfPanel");
+  const image = document.getElementById("sourcePdfImage");
+  document.getElementById("sourceViewerTitle").textContent = cite.title;
+  status.textContent = "Loading source…";
+  textBox.textContent = "";
+  image.removeAttribute("src");
+  pdfPanel.style.display = "none";
+  sourceModal.classList.add("open");
+  try {
+    const url = `/api/documents/${encodeURIComponent(cite.doc_id)}/chunks/${encodeURIComponent(cite.chunk_id)}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Source excerpt is unavailable. It may have been deleted.");
+    const source = await response.json();
+    const finding = currentReport?.key_findings?.find(item => item.citations?.includes(cite.id));
+    const selectedQuote = finding?.content?.replace(/\s*\[\d+\]\s*$/, "").replace(/\.\.\.$/, "").trim();
+    const sourceSnippet = cite.snippet.replace(/\.\.\.$/, "").trim();
+    const excerpt = selectedQuote && source.content.includes(selectedQuote) ? selectedQuote : sourceSnippet;
+    const offset = source.content.indexOf(excerpt);
+    textBox.innerHTML = offset >= 0
+      ? `${escapeHtml(source.content.slice(0, offset))}<mark>${escapeHtml(excerpt)}</mark>${escapeHtml(source.content.slice(offset + excerpt.length))}`
+      : escapeHtml(source.content);
+    status.textContent = `Page ${source.page_number || 1} · Highlighted indexed passage`;
+    if (source.pdf_available) {
+      pdfPanel.style.display = "block";
+      image.src = `/api/documents/${encodeURIComponent(cite.doc_id)}/pages/${source.page_number || 1}/preview?quote=${encodeURIComponent(excerpt)}`;
+    } else if (cite.source_type === "document" && cite.title.toLowerCase().includes(".pdf")) {
+      status.textContent += " · Original PDF unavailable; re-upload to enable PDF preview";
+    }
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+async function openEvaluation() {
+  const container = document.getElementById("evaluationContent");
+  container.textContent = "Running the bundled benchmark…";
+  evaluationModal.classList.add("open");
+  try {
+    const response = await fetch("/api/evaluation");
+    if (!response.ok) throw new Error("Benchmark could not run.");
+    const data = await response.json();
+    const metrics = data.metrics;
+    const cards = [
+      ["Hit @ 1", `${(metrics.hit_at_1 * 100).toFixed(0)}%`],
+      ["Hit @ 3", `${(metrics.hit_at_3 * 100).toFixed(0)}%`],
+      ["Source @ 1", `${(metrics.source_at_1 * 100).toFixed(0)}%`],
+      ["Abstention", `${(metrics.abstention_rate * 100).toFixed(0)}%`],
+      ["MRR @ 3", metrics.mrr_at_3.toFixed(3)],
+      ["Mean search time", `${metrics.mean_latency_ms.toFixed(1)} ms`]
+    ];
+    container.innerHTML = `
+      <p class="evaluation-description">${escapeHtml(data.dataset)} · ${data.questions} questions · ${data.documents} documents · ${data.chunks} chunks</p>
+      <div class="evaluation-metrics">${cards.map(([name, value]) => `
+        <div class="evaluation-metric"><strong>${value}</strong><span>${name}</span></div>
+      `).join("")}</div>
+      <div style="overflow-x: auto;"><table class="evaluation-table">
+        <thead><tr><th>Question</th><th>Expected source</th><th>Top source</th><th>Rank</th><th>Result</th></tr></thead>
+        <tbody>${data.cases.map(row => `<tr>
+          <td>${escapeHtml(row.query)}</td>
+          <td>${escapeHtml(row.expected_source || "No match")}</td>
+          <td>${escapeHtml(row.top_source || "None")}</td>
+          <td>${row.rank || "—"}</td>
+          <td class="${row.success ? "pass" : "fail"}">${row.success ? "Pass" : "Miss"}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+    `;
+  } catch (error) {
+    container.textContent = error.message;
+  }
 }
 
 // ---------------- Knowledge Graph Canvas ----------------

@@ -1,10 +1,8 @@
 import os
 import json
-import time
+import re
 from typing import List, Dict, Any, Optional, Tuple
-from backend.models import (
-    PlanStep, AgentAction, Citation, Finding, ResearchReport, KnowledgeGraph, KnowledgeNode, KnowledgeEdge
-)
+from backend.models import PlanStep, Citation, Finding, ResearchReport
 
 
 class GeminiClient:
@@ -45,7 +43,7 @@ class GeminiClient:
             {
                 "type": "function",
                 "name": "search_documents",
-                "description": "Searches user-uploaded documents (PDFs, Markdown, technical reports) using vector semantic search.",
+                "description": "Searches indexed user documents using full-text retrieval.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -134,8 +132,8 @@ Example:
 [
   {{"id": 1, "title": "Deconstruct Scope & Query Document Store", "description": "Formulate search queries for local document context"}},
   {{"id": 2, "title": "Retrieve Web Intel & State-of-the-Art Benchmarks", "description": "Gather live external verification and industry data"}},
-  {{"id": 3, "title": "Cross-Source Evidence Synthesis & Trade-off Analysis", "description": "Synthesize empirical observations across sources"}},
-  {{"id": 4, "title": "Generate Grounded Executive Report & Knowledge Graph", "description": "Assemble final report with citations and concept graph"}}
+  {{"id": 3, "title": "Review Retrieved Evidence", "description": "Identify relevant source excerpts"}},
+  {{"id": 4, "title": "Verify Source Quotes", "description": "Check selected quotes against citation text"}}
 ]
 """
                 resp = self._client.interactions.create(
@@ -156,7 +154,7 @@ Example:
             PlanStep(
                 id=1,
                 title="Deconstruct Query & Query Vector Store",
-                description=f"Formulate semantic search vectors to extract core excerpts for '{query[:40]}...' from ingested documents."
+                description=f"Find relevant excerpts for '{query[:40]}...' in indexed documents."
             ),
             PlanStep(
                 id=2,
@@ -165,13 +163,13 @@ Example:
             ),
             PlanStep(
                 id=3,
-                title="Cross-Source Evidence Synthesis & Trade-off Analysis",
-                description="Cross-reference claims, calculate confidence metrics, and identify key operational tradeoffs."
+                title="Review Retrieved Evidence",
+                description="Identify source excerpts relevant to the question."
             ),
             PlanStep(
                 id=4,
-                title="Synthesize Executive Report & Knowledge Graph",
-                description="Construct executive brief, key findings with grounded citations [1], and interactive entity relationships."
+                title="Verify Source Quotes",
+                description="Check selected quotes against their cited source excerpts."
             )
         ]
 
@@ -183,46 +181,23 @@ Example:
         depth: str = "balanced"
     ) -> ResearchReport:
         """Synthesizes observations and citations into a comprehensive executive report."""
+        if not citations:
+            return self._generate_fallback_report(query, observations, citations, depth)
         if self.has_api_key():
             try:
-                obs_summary = json.dumps(observations, indent=2)
-                cite_summary = "\n".join([f"[{c.id}] {c.title} ({c.url_or_page or 'Document'})" for c in citations])
-                prompt = f"""You are InsightPilot, an elite Research Synthesizer.
-Research Query: "{query}"
-Gathered Observations:
-{obs_summary[:4000]}
+                cite_summary = "\n".join(
+                    f"[{c.id}] {c.title}: {c.snippet.removesuffix('...').strip()}"
+                    for c in citations[:20]
+                )
+                prompt = f"""Select up to five useful source excerpts for this research query: {query!r}.
+Use only the numbered excerpts below. Copy each quote exactly from its own excerpt.
+Do not paraphrase, infer a claim, add facts, or use a quote from a different citation.
+Every quote must contain at least 24 characters.
 
-Available Citations:
 {cite_summary}
 
-Write a comprehensive, professional research report.
-Output STRICTLY a valid JSON object matching this schema:
-{{
-  "executive_summary": "2-3 dense analytical paragraphs synthesizing findings...",
-  "key_findings": [
-    {{
-      "heading": "Finding Title",
-      "content": "Detailed explanation citing sources using [1], [2]...",
-      "key_takeaway": "One sentence key takeaway",
-      "citations": [1]
-    }}
-  ],
-  "comparative_matrix": {{
-    "Dimension": ["Metric A", "Metric B"],
-    "Current State": ["Details...", "Details..."],
-    "Future Horizon": ["Details...", "Details..."]
-  }},
-  "strategic_implications": ["Actionable implication 1", "Actionable implication 2", "Actionable implication 3"],
-  "knowledge_graph": {{
-    "nodes": [
-      {{"id": "n1", "label": "Topic Core", "category": "Core Focus", "importance": 1.5}},
-      {{"id": "n2", "label": "Key Concept", "category": "Insight Area", "importance": 1.2}}
-    ],
-    "edges": [
-      {{"source": "n1", "target": "n2", "relationship": "drives"}}
-    ]
-  }}
-}}
+Return only JSON: {{"selected_evidence": [{{"citation_id": 1, "quote": "exact source text"}}]}}
+Return an empty list if none qualify.
 """
                 resp = self._client.interactions.create(
                     model=self.model,
@@ -233,28 +208,61 @@ Output STRICTLY a valid JSON object matching this schema:
                 end = text.rfind("}") + 1
                 if start != -1 and end != 0:
                     data = json.loads(text[start:end])
-                    kg_data = data.get("knowledge_graph", {})
-                    nodes = [KnowledgeNode(**n) for n in kg_data.get("nodes", [])]
-                    edges = [KnowledgeEdge(**e) for e in kg_data.get("edges", [])]
-                    kg = KnowledgeGraph(nodes=nodes, edges=edges)
-
-                    findings = [Finding(**f) for f in data.get("key_findings", [])]
+                    findings, rejected_count = self._verify_selected_evidence(
+                        data.get("selected_evidence", []), citations
+                    )
+                    if not findings:
+                        raise ValueError("Model selected no valid source quotes")
 
                     return ResearchReport(
                         query=query,
                         depth=depth,
-                        executive_summary=data.get("executive_summary", ""),
+                        executive_summary=(f"Found {len(citations)} source excerpt(s) for '{query}'. "
+                                           f"The {len(findings)} finding(s) below are exact text from their cited sources."),
                         key_findings=findings,
-                        comparative_matrix=data.get("comparative_matrix"),
-                        strategic_implications=data.get("strategic_implications", []),
                         citations=citations,
-                        knowledge_graph=kg,
-                        metrics={"model": self.model, "tokens": 1420}
+                        metrics={"model": self.model, "mode": "verified_quotes",
+                                 "rejected_quotes": rejected_count}
                     )
             except Exception as e:
                 print(f"[GeminiClient] Gemini synthesis error: {e}. Using fallback synthesizer.")
 
         return self._generate_fallback_report(query, observations, citations, depth)
+
+    @staticmethod
+    def _verify_selected_evidence(selected: Any, citations: List[Citation]) -> Tuple[List[Finding], int]:
+        """Accept only substantial quotes copied from the matching citation excerpt."""
+        if not isinstance(selected, list):
+            return [], 1
+        by_id = {c.id: c for c in citations[:20]}
+        findings: List[Finding] = []
+        rejected = 0
+        seen = set()
+        for item in selected[:20]:
+            if not isinstance(item, dict):
+                rejected += 1
+                continue
+            citation_id = item.get("citation_id")
+            quote = item.get("quote")
+            citation = by_id.get(citation_id) if type(citation_id) is int else None
+            if not citation or not isinstance(quote, str):
+                rejected += 1
+                continue
+            normalized_quote = re.sub(r"\s+", " ", quote).strip()
+            source = re.sub(r"\s+", " ", citation.snippet.removesuffix("...")).strip()
+            if (len(normalized_quote) < 24 or normalized_quote not in source or
+                    (citation_id, normalized_quote) in seen):
+                rejected += 1
+                continue
+            seen.add((citation_id, normalized_quote))
+            findings.append(Finding(
+                heading=citation.title,
+                content=f"{normalized_quote} [{citation_id}]",
+                citations=[citation_id]
+            ))
+            if len(findings) == 5:
+                break
+        return findings, rejected
 
     def _generate_fallback_report(
         self,
@@ -263,86 +271,22 @@ Output STRICTLY a valid JSON object matching this schema:
         citations: List[Citation],
         depth: str
     ) -> ResearchReport:
-        doc_citations = [c for c in citations if c.source_type == "document"]
-        web_citations = [c for c in citations if c.source_type == "web"]
+        if not citations:
+            return ResearchReport(
+                query=query, depth=depth,
+                executive_summary="No matching document excerpts or live web sources were found. Try a different query, upload a relevant document, or enable web search.",
+                metrics={"mode": "no_evidence"}
+            )
 
-        exec_summary = (
-            f"This intelligence assessment explores the technical paradigms, operational implications, and frontier "
-            f"trajectories of '{query}'. Drawing upon {len(doc_citations)} verified internal document extractions and "
-            f"{len(web_citations)} external intelligence sources, our analysis demonstrates accelerating adoption "
-            f"coupled with significant architectural considerations in scalability, efficiency, and governance.\n\n"
-            f"Key observations reveal that organizations implementing structured workflows in this domain achieve "
-            f"superior throughput and lower error rates, while mitigating common reliability bottlenecks through automated "
-            f"validation checkpoints."
-        )
-
-        findings = []
-        c1_ids = [c.id for c in citations[:2]] or [1]
-        c2_ids = [c.id for c in citations[2:4]] or c1_ids
-
-        findings.append(Finding(
-            heading="Architectural Foundations & Core Capabilities",
-            content=f"Evaluation of primary source data indicates that core advancements in '{query}' rely heavily on modular "
-                    f"pipeline decoupling, optimized context management, and deterministic evaluation loops "
-                    f"{' '.join([f'[{i}]' for i in c1_ids])}. Organizations shifting away from monolithic paradigms "
-                    f"report marked improvements in deployment agility.",
-            key_takeaway="Modular component isolation yields superior resiliency and lower latency overhead.",
-            citations=c1_ids
-        ))
-
-        findings.append(Finding(
-            heading="Comparative Performance & Operational Trade-offs",
-            content=f"Cross-referencing verified benchmarks shows distinct trade-offs between computational throughput "
-                    f"and reasoning depth {' '.join([f'[{i}]' for i in c2_ids])}. While accelerated execution reduces "
-                    f"direct operational overhead, multi-pass reasoning agents consistently deliver higher precision "
-                    f"on edge cases.",
-            key_takeaway="Multi-stage verification significantly reduces hallucination and edge-case failure rates.",
-            citations=c2_ids
-        ))
-
-        findings.append(Finding(
-            heading="Emerging Trends & Horizon Trajectory",
-            content=f"Frontier developments highlight an increasing convergence toward multimodal grounding and autonomous "
-                    f"tool orchestration. Future iterations will focus on dynamic tool generation and zero-overhead memory persistence.",
-            key_takeaway="Autonomous tool-calling and multimodal grounding represent the dominant medium-term standard.",
-            citations=c1_ids
-        ))
-
-        comp_matrix = {
-            "Dimension": ["Accuracy & Factuality", "Inference Latency", "Context Utilization", "Extensibility"],
-            "Conventional Baseline": ["74% - 81%", "150ms - 300ms", "Single-turn sliding window", "Hardcoded API connectors"],
-            "InsightPilot Autonomous Agent": ["96.4% (Ground-Verified)", "Streamed Real-Time", "Full Multi-chunk RAG", "Dynamic Function Calling Tools"]
-        }
-
-        strategic_implications = [
-            f"Prioritize continuous RAG indexing over one-off vector ingests to maintain context freshness for '{query}'.",
-            "Incorporate automated multi-pass verification checkpoints before presenting synthesized findings to stakeholders.",
-            "Standardize on structured JSON schemas (e.g. Pydantic models) to eliminate schema drift across agent toolchains."
-        ]
-
-        nodes = [
-            KnowledgeNode(id="core", label=query[:24], category="Core Objective", importance=2.0),
-            KnowledgeNode(id="rag", label="Vector RAG", category="Infrastructure", importance=1.4),
-            KnowledgeNode(id="eval", label="Fact Verification", category="Safety/Quality", importance=1.3),
-            KnowledgeNode(id="tools", label="Tool Orchestration", category="Agent Capability", importance=1.4),
-            KnowledgeNode(id="synth", label="Executive Synthesis", category="Deliverable", importance=1.2)
-        ]
-        edges = [
-            KnowledgeEdge(source="core", target="rag", relationship="retrieves_context"),
-            KnowledgeEdge(source="core", target="tools", relationship="invokes_actions"),
-            KnowledgeEdge(source="tools", target="eval", relationship="validates_evidence"),
-            KnowledgeEdge(source="eval", target="synth", relationship="informs_citations")
-        ]
-        kg = KnowledgeGraph(nodes=nodes, edges=edges)
-
+        findings = [Finding(
+            heading=c.title,
+            content=f"{c.snippet} [{c.id}]",
+            citations=[c.id]
+        ) for c in citations[:5]]
         return ResearchReport(
-            query=query,
-            depth=depth,
-            executive_summary=exec_summary,
+            query=query, depth=depth,
+            executive_summary=f"Found {len(citations)} source excerpt(s) for '{query}'. The excerpts below are provided without additional inferred claims.",
             key_findings=findings,
-            comparative_matrix=comp_matrix,
-            strategic_implications=strategic_implications,
             citations=citations,
-            knowledge_graph=kg,
-            metrics={"mode": "Autonomous High-Fidelity Engine", "latency_s": 2.4, "confidence": 0.96}
+            metrics={"mode": "extractive_fallback"}
         )

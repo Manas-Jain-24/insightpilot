@@ -26,7 +26,6 @@ load_dotenv()
 
 vector_store = VectorStore()
 gemini_client = GeminiClient()
-vector_store.gemini_client = gemini_client
 db = Database()
 
 
@@ -41,6 +40,8 @@ def seed_sample_data():
         fpath = os.path.join(sample_dir, fname)
         if os.path.isfile(fpath) and fname.endswith((".txt", ".md", ".pdf")):
             try:
+                if any(d.filename == fname for d in vector_store.list_documents()):
+                    continue
                 meta, chunks = loader.load_file(fpath, fname)
                 vector_store.add_document(meta, chunks)
                 print(f"[Startup] Indexed sample document: {fname} ({len(chunks)} chunks)")
@@ -53,7 +54,7 @@ async def lifespan(app: FastAPI):
     # Startup: Seed sample documents
     seed_sample_data()
     yield
-    # Shutdown logic if needed
+    vector_store.close()
 
 
 app = FastAPI(

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>InsightPilot | Autonomous Multimodal Research & Knowledge Agent</title>
-  <meta name="description" content="Production-grade AI research agent featuring ReAct loops, vector RAG, tool calling, and live knowledge synthesis.">
+  <meta name="description" content="AI research assistant with document search, web retrieval, and live source-backed reports.">
   
   <!-- Modern Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -39,6 +39,10 @@
         📜 History (<span id="historyCountPill">0</span>)
       </button>
 
+      <button class="btn btn-secondary" id="btnOpenEvaluation" title="Open the repeatable retrieval benchmark">
+        📊 Evaluation
+      </button>
+
       <button class="btn btn-secondary" id="btnOpenSettings" title="Configure Gemini API or Simulation Mode">
         ⚙️ Settings
       </button>
@@ -52,7 +56,7 @@
     <section class="hero-card">
       <div class="hero-header">
         <h2>Autonomous Multimodal Research & Knowledge Synthesis</h2>
-        <p>Enter any technical topic, market domain, or question. The agent autonomously plans, executes vector RAG, searches the web, and generates verifiable executive reports.</p>
+        <p>Enter a research question. InsightPilot searches your documents and, if enabled, the web, then shows a source-backed report.</p>
       </div>
 
       <div class="prompt-box">
@@ -76,7 +80,7 @@
 
             <label class="select-pill" style="cursor: pointer;">
               <input type="checkbox" id="checkUseDocs" checked style="accent-color: var(--accent-cyan);">
-              <span>Query Vector RAG</span>
+              <span>Search Documents</span>
             </label>
 
             <label class="select-pill" style="cursor: pointer;">
@@ -131,7 +135,7 @@
             <div class="step-badge">2</div>
             <div class="step-info">
               <h4>Vector Store RAG Retrieval</h4>
-              <p>Extract semantic matches from documents</p>
+              <p>Find matching excerpts from documents</p>
             </div>
           </div>
           <div class="step-card">
@@ -144,8 +148,8 @@
           <div class="step-card">
             <div class="step-badge">4</div>
             <div class="step-info">
-              <h4>Grounded Synthesis & Knowledge Graph</h4>
-              <p>Compile executive brief with verified citations</p>
+              <h4>Quote Verification</h4>
+              <p>Check selected quotes against cited excerpts</p>
             </div>
           </div>
         </div>
@@ -166,7 +170,7 @@
         <div class="empty-state" id="reportEmptyState">
           <div class="empty-icon">📊</div>
           <h3>Intelligence Report Workspace</h3>
-          <p>Launch an autonomous research run to see live citations, comparative matrix analysis, and an interactive knowledge graph appear here in real time.</p>
+          <p>Launch a research run to see retrieved sources and checked excerpts appear here.</p>
         </div>
 
         <!-- Generated Report Container (Initially Hidden) -->
@@ -181,7 +185,7 @@
                 <span>•</span>
                 <span id="reportCitationsCount">0 Citations</span>
                 <span>•</span>
-                <span class="status-badge" style="padding: 0.2rem 0.6rem; font-size: 0.72rem;" id="reportModelBadge">Gemini 3.8 Flash</span>
+                <span class="status-badge" style="padding: 0.2rem 0.6rem; font-size: 0.72rem;" id="reportModelBadge">Evidence report</span>
               </div>
             </div>
 
@@ -197,13 +201,13 @@
 
           <!-- Executive Summary Section -->
           <div class="section-card">
-            <h3><span>📌</span> Executive Summary</h3>
+            <h3><span>📌</span> Report Overview</h3>
             <p class="exec-summary-text" id="execSummaryContent"></p>
           </div>
 
           <!-- Key Analytical Findings Section -->
           <div class="section-card">
-            <h3><span>🔍</span> Key Analytical Findings & Grounded Evidence</h3>
+            <h3><span>🔍</span> Selected Source Excerpts</h3>
             <div id="findingsContainer"></div>
           </div>
 
@@ -219,7 +223,7 @@
           </div>
 
           <!-- Interactive Concept Knowledge Graph -->
-          <div class="section-card">
+          <div class="section-card" id="knowledgeGraphSection">
             <h3><span>🌐</span> Interactive Knowledge & Entity Graph</h3>
             <div class="canvas-wrapper">
               <canvas id="kgCanvas"></canvas>
@@ -256,7 +260,7 @@
       <div class="dropzone" id="fileDropzone">
         <div class="dropzone-icon">📄</div>
         <h4>Drag & Drop research PDFs, Markdown, or TXT</h4>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem;">Documents are semantically chunked and indexed into the Vector Store.</p>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem;">Documents are chunked and indexed in persistent SQLite search.</p>
         <input type="file" id="fileInput" accept=".pdf,.txt,.md,.json,.csv" style="display: none;">
       </div>
 
@@ -285,8 +289,11 @@
           placeholder="AIzaSy..." 
           style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #fff; font-family: var(--font-mono); font-size: 0.85rem;"
         >
+        <label style="display: block; margin-top: 0.65rem; font-size: 0.8rem;">
+          <input type="checkbox" id="rememberApiKey"> Remember key in this browser
+        </label>
         <p style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.4rem;">
-          InsightPilot is powered by <strong>Gemini 3.8 Flash</strong> via the official <code>google-genai</code> SDK. If no key is entered, InsightPilot runs in <strong>Autonomous High-Fidelity Demo Mode</strong> so recruiters can test without configuration.
+          With a Gemini key, InsightPilot selects source quotes and checks them against retrieved excerpts. Without a key, it shows source excerpts. If no sources are found, it says so.
         </p>
       </div>
 
@@ -294,7 +301,7 @@
         <div style="font-weight: 600; color: #fff; margin-bottom: 0.3rem;">Portfolio Architecture Highlights:</div>
         <div>• <strong>Framework:</strong> FastAPI & Pydantic V2 Asynchronous Architecture</div>
         <div>• <strong>Orchestration:</strong> ReAct Agent Loop (Plan ➔ Reason ➔ Act ➔ Observe ➔ Synthesize)</div>
-        <div>• <strong>Retrieval:</strong> Hybrid Semantic RAG + Cosine Vector Matching</div>
+        <div>• <strong>Retrieval:</strong> Persistent SQLite full-text search with BM25 ranking</div>
         <div>• <strong>Streaming:</strong> Server-Sent Events (SSE) with Real-Time Latency Telemetry</div>
       </div>
 
@@ -328,6 +335,37 @@
       <div class="file-list" id="historyListContainer">
         <div style="font-size: 0.85rem; color: var(--text-muted);">Loading past reports...</div>
       </div>
+    </div>
+  </div>
+
+  <!-- Source Viewer -->
+  <div class="modal-backdrop" id="sourceModal">
+    <div class="modal-card source-viewer-card">
+      <div class="modal-header">
+        <h3 id="sourceViewerTitle">Source</h3>
+        <button class="close-btn" id="btnCloseSource" aria-label="Close source viewer">&times;</button>
+      </div>
+      <div class="source-viewer-layout">
+        <div class="source-pdf-panel" id="sourcePdfPanel">
+          <img id="sourcePdfImage" alt="Rendered page of the original PDF source">
+        </div>
+        <div class="source-excerpt-panel">
+          <p id="sourceViewerStatus"></p>
+          <div id="sourceViewerText" class="source-excerpt-text"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Evaluation Dashboard -->
+  <div class="modal-backdrop" id="evaluationModal">
+    <div class="modal-card evaluation-card">
+      <div class="modal-header">
+        <h3>📊 Retrieval Evaluation</h3>
+        <button class="close-btn" id="btnCloseEvaluation" aria-label="Close evaluation">&times;</button>
+      </div>
+      <p class="evaluation-description">Repeatable questions over the bundled sample documents. Scores measure retrieval, not whether the documents' claims are true.</p>
+      <div id="evaluationContent">Loading benchmark…</div>
     </div>
   </div>
 

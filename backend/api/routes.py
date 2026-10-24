@@ -2,8 +2,9 @@ import os
 import json
 import shutil
 import tempfile
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from fastapi.responses import StreamingResponse, PlainTextResponse
+import uuid
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi.responses import StreamingResponse, PlainTextResponse, Response
 from typing import List, Dict, Any, Optional
 from backend.models import (
     ResearchRequest, DocumentMetadata, ResearchReport
@@ -13,6 +14,8 @@ from backend.rag.vector_store import VectorStore
 from backend.agent.gemini_client import GeminiClient
 from backend.agent.orchestrator import ResearchOrchestrator
 from backend.db.database import Database
+from backend.eval.benchmark import run_benchmark
+from backend.rag.pdf_preview import render_pdf_page
 
 
 def create_router(
@@ -32,15 +35,19 @@ def create_router(
             "service": "InsightPilot Intelligence API",
             "gemini_api_configured": gemini_client.has_api_key(),
             "indexed_documents": len(vector_store.list_documents()),
-            "total_chunks": len(vector_store.chunks),
+            "total_chunks": vector_store.count_chunks(),
             "database_connected": bool(db),
             "saved_reports_count": reports_count
         }
 
+    @router.get("/evaluation")
+    def evaluation():
+        return run_benchmark()
+
     # ---------------- Document Ingestion ----------------
     @router.post("/documents/upload", response_model=DocumentMetadata)
     async def upload_document(file: UploadFile = File(...)):
-        filename = file.filename or "uploaded_doc"
+        filename = os.path.basename((file.filename or "uploaded_doc").replace("\\", "/"))
         ext = os.path.splitext(filename)[1].lower()
 
         allowed_exts = [".pdf", ".txt", ".md", ".json", ".csv"]
@@ -50,18 +57,34 @@ def create_router(
                 detail=f"Unsupported file format '{ext}'. Supported formats: {', '.join(allowed_exts)}"
             )
 
+        max_upload_bytes = 10 * 1024 * 1024
         temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, filename)
+        temp_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}{ext}")
 
         try:
+            total = 0
             with open(temp_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+                while chunk := await file.read(1024 * 1024):
+                    total += len(chunk)
+                    if total > max_upload_bytes:
+                        raise HTTPException(status_code=413, detail="File exceeds 10 MB upload limit")
+                    buffer.write(chunk)
 
             metadata, chunks = doc_loader.load_file(temp_path, filename)
-            vector_store.add_document(metadata, chunks)
+            if not chunks:
+                raise HTTPException(status_code=422, detail="Document contains no extractable text")
+            source_bytes = None
+            if ext == ".pdf":
+                with open(temp_path, "rb") as source_file:
+                    source_bytes = source_file.read()
+            vector_store.add_document(metadata, chunks, source_bytes=source_bytes)
             return metadata
+        except HTTPException:
+            raise
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to process document")
         finally:
             try:
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -71,6 +94,39 @@ def create_router(
     @router.get("/documents", response_model=List[DocumentMetadata])
     def list_documents():
         return vector_store.list_documents()
+
+    @router.get("/documents/{doc_id}/file")
+    def get_document_file(doc_id: str):
+        pdf = vector_store.get_pdf_bytes(doc_id)
+        if pdf is None:
+            raise HTTPException(status_code=404, detail="PDF source unavailable; re-upload this document")
+        return Response(pdf, media_type="application/pdf", headers={
+            "Content-Disposition": "inline; filename=source.pdf",
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff"
+        })
+
+    @router.get("/documents/{doc_id}/pages/{page_number}/preview")
+    def preview_pdf_page(doc_id: str, page_number: int, quote: str = Query(default="", max_length=240)):
+        pdf = vector_store.get_pdf_bytes(doc_id)
+        if pdf is None:
+            raise HTTPException(status_code=404, detail="PDF source unavailable")
+        try:
+            png = render_pdf_page(pdf, page_number, quote)
+        except IndexError:
+            raise HTTPException(status_code=404, detail="Page not found")
+        except Exception:
+            raise HTTPException(status_code=422, detail="Could not render PDF page")
+        return Response(png, media_type="image/png", headers={"Cache-Control": "private, no-store"})
+
+    @router.get("/documents/{doc_id}/chunks/{chunk_id}")
+    def get_document_chunk(doc_id: str, chunk_id: str):
+        chunk = vector_store.get_chunk(doc_id, chunk_id)
+        if chunk is None:
+            raise HTTPException(status_code=404, detail="Source excerpt unavailable")
+        return {"doc_id": doc_id, "chunk_id": chunk.id,
+                "page_number": chunk.page_number, "content": chunk.content,
+                "pdf_available": vector_store.has_pdf(doc_id)}
 
     @router.delete("/documents/{doc_id}")
     def delete_document(doc_id: str):

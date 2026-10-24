@@ -1,181 +1,132 @@
-import math
+"""Persistent document storage and indexed lexical retrieval."""
+
+import os
 import re
-import numpy as np
-from typing import List, Tuple, Dict, Optional, Any
+import sqlite3
+import threading
+from typing import List, Optional, Tuple
+
 from backend.models import DocumentChunk, DocumentMetadata
 
 
 class VectorStore:
-    """Hybrid Vector Store with semantic similarity search and fallback embedding vectorizer."""
+    """SQLite FTS5 backed retrieval. The legacy name is kept for API compatibility."""
 
-    def __init__(self, gemini_client=None):
+    def __init__(self, gemini_client=None, db_path: Optional[str] = None):
         self.gemini_client = gemini_client
-        self.documents: Dict[str, DocumentMetadata] = {}
-        self.chunks: List[DocumentChunk] = []
-        self._vocab: Dict[str, int] = {}
-        self._idf: Dict[str, float] = {}
-        self._tfidf_matrix: Optional[np.ndarray] = None
+        self.db_path = db_path or os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "data", "documents.db"
+        )
+        if self.db_path != ":memory:":
+            os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
+        self._lock = threading.RLock()
+        self._connection = sqlite3.connect(self.db_path, check_same_thread=False)
+        self._connection.row_factory = sqlite3.Row
+        with self._connection:
+            self._connection.execute("PRAGMA journal_mode=WAL")
+            self._connection.execute("CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, metadata TEXT NOT NULL)")
+            self._connection.execute("CREATE TABLE IF NOT EXISTS chunks (id TEXT PRIMARY KEY, doc_id TEXT NOT NULL, payload TEXT NOT NULL)")
+            self._connection.execute("CREATE TABLE IF NOT EXISTS document_files (doc_id TEXT PRIMARY KEY, content BLOB NOT NULL)")
+            self._connection.execute("CREATE INDEX IF NOT EXISTS chunks_doc_id ON chunks(doc_id)")
+            self._connection.execute("CREATE VIRTUAL TABLE IF NOT EXISTS chunk_search USING fts5(chunk_id UNINDEXED, content)")
 
-    def add_document(self, metadata: DocumentMetadata, chunks: List[DocumentChunk]) -> None:
-        self.documents[metadata.id] = metadata
-        self.chunks.extend(chunks)
-        self._rebuild_index()
+    @property
+    def chunks(self) -> List[DocumentChunk]:
+        with self._lock:
+            rows = self._connection.execute("SELECT payload FROM chunks").fetchall()
+        return [DocumentChunk.model_validate_json(row[0]) for row in rows]
+
+    def count_chunks(self) -> int:
+        with self._lock:
+            return self._connection.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+
+    def close(self) -> None:
+        with self._lock:
+            self._connection.close()
+
+    def add_document(self, metadata: DocumentMetadata, chunks: List[DocumentChunk],
+                     source_bytes: Optional[bytes] = None) -> None:
+        with self._lock, self._connection:
+            self._delete_document(metadata.id)
+            self._connection.execute("INSERT INTO documents VALUES (?, ?)", (metadata.id, metadata.model_dump_json()))
+            if source_bytes is not None and metadata.file_type == "PDF":
+                self._connection.execute("INSERT INTO document_files VALUES (?, ?)",
+                                         (metadata.id, source_bytes))
+            for chunk in chunks:
+                self._connection.execute("INSERT INTO chunks VALUES (?, ?, ?)",
+                                         (chunk.id, metadata.id, chunk.model_dump_json()))
+                self._connection.execute("INSERT INTO chunk_search (chunk_id, content) VALUES (?, ?)",
+                                         (chunk.id, chunk.content))
+
+    def _delete_document(self, doc_id: str) -> None:
+        self._connection.execute("DELETE FROM document_files WHERE doc_id = ?", (doc_id,))
+        self._connection.execute("DELETE FROM chunk_search WHERE chunk_id IN (SELECT id FROM chunks WHERE doc_id = ?)", (doc_id,))
+        self._connection.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+        self._connection.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
 
     def remove_document(self, doc_id: str) -> None:
-        if doc_id in self.documents:
-            del self.documents[doc_id]
-        self.chunks = [c for c in self.chunks if c.doc_id != doc_id]
-        self._rebuild_index()
+        with self._lock, self._connection:
+            self._delete_document(doc_id)
 
     def list_documents(self) -> List[DocumentMetadata]:
-        return list(self.documents.values())
+        with self._lock:
+            rows = self._connection.execute("SELECT metadata FROM documents").fetchall()
+        return [DocumentMetadata.model_validate_json(row[0]) for row in rows]
 
     def get_document(self, doc_id: str) -> Optional[DocumentMetadata]:
-        return self.documents.get(doc_id)
+        with self._lock:
+            row = self._connection.execute("SELECT metadata FROM documents WHERE id = ?", (doc_id,)).fetchone()
+        return DocumentMetadata.model_validate_json(row[0]) if row else None
 
-    def _tokenize(self, text: str) -> List[str]:
-        text = text.lower()
-        tokens = re.findall(r"\b[a-zA-Z0-9_\-\.]{2,}\b", text)
-        return tokens
+    def get_chunk(self, doc_id: str, chunk_id: str) -> Optional[DocumentChunk]:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT payload FROM chunks WHERE doc_id = ? AND id = ?", (doc_id, chunk_id)
+            ).fetchone()
+        return DocumentChunk.model_validate_json(row[0]) if row else None
 
-    def _rebuild_index(self) -> None:
-        if not self.chunks:
-            self._tfidf_matrix = None
-            self._vocab = {}
-            self._idf = {}
-            return
+    def get_pdf_bytes(self, doc_id: str) -> Optional[bytes]:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT f.content FROM document_files f JOIN documents d ON d.id = f.doc_id "
+                "WHERE f.doc_id = ?", (doc_id,)
+            ).fetchone()
+        return bytes(row[0]) if row else None
 
-        doc_count = len(self.chunks)
-        vocab_counter: Dict[str, int] = {}
-        doc_tokens_list: List[List[str]] = []
+    def has_pdf(self, doc_id: str) -> bool:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT 1 FROM document_files WHERE doc_id = ?", (doc_id,)
+            ).fetchone()
+        return row is not None
 
-        for chunk in self.chunks:
-            tokens = set(self._tokenize(chunk.content))
-            doc_tokens_list.append(self._tokenize(chunk.content))
-            for tok in tokens:
-                vocab_counter[tok] = vocab_counter.get(tok, 0) + 1
-
-        # Keep top informative tokens
-        sorted_tokens = sorted(vocab_counter.items(), key=lambda x: x[1], reverse=True)[:5000]
-        self._vocab = {tok: idx for idx, (tok, _) in enumerate(sorted_tokens)}
-
-        self._idf = {}
-        for tok, df in vocab_counter.items():
-            if tok in self._vocab:
-                self._idf[tok] = math.log((1 + doc_count) / (1 + df)) + 1.0
-
-        # Build tf-idf matrix
-        matrix = np.zeros((doc_count, len(self._vocab)), dtype=np.float32)
-        for i, tokens in enumerate(doc_tokens_list):
-            tf: Dict[str, int] = {}
-            for t in tokens:
-                if t in self._vocab:
-                    tf[t] = tf.get(t, 0) + 1
-
-            for t, count in tf.items():
-                col = self._vocab[t]
-                tf_norm = 1.0 + math.log(count) if count > 0 else 0
-                matrix[i, col] = tf_norm * self._idf.get(t, 1.0)
-
-            # L2 normalize
-            norm = np.linalg.norm(matrix[i])
-            if norm > 0:
-                matrix[i] /= norm
-
-        self._tfidf_matrix = matrix
-
-    def similarity_search(
-        self,
-        query: str,
-        top_k: int = 4,
-        filter_doc_ids: Optional[List[str]] = None
-    ) -> List[Tuple[DocumentChunk, float]]:
-        """Searches for chunks most relevant to query using cosine similarity."""
-        if not self.chunks or self._tfidf_matrix is None:
+    def similarity_search(self, query: str, top_k: int = 4,
+                          filter_doc_ids: Optional[List[str]] = None) -> List[Tuple[DocumentChunk, float]]:
+        if top_k <= 0 or filter_doc_ids == []:
             return []
-
-        # Try Gemini API embedding if configured
-        if self.gemini_client and self.gemini_client.has_api_key():
-            try:
-                results = self._gemini_vector_search(query, top_k, filter_doc_ids)
-                if results:
-                    return results
-            except Exception:
-                pass  # Fall back to local hybrid vector engine
-
-        # Local semantic vector engine
-        q_tokens = self._tokenize(query)
-        q_vec = np.zeros(len(self._vocab), dtype=np.float32)
-
-        tf: Dict[str, int] = {}
-        for t in q_tokens:
-            if t in self._vocab:
-                tf[t] = tf.get(t, 0) + 1
-
-        for t, count in tf.items():
-            col = self._vocab[t]
-            tf_norm = 1.0 + math.log(count) if count > 0 else 0
-            q_vec[col] = tf_norm * self._idf.get(t, 1.0)
-
-        norm = np.linalg.norm(q_vec)
-        if norm > 0:
-            q_vec /= norm
-
-        # Compute cosine similarity
-        scores = np.dot(self._tfidf_matrix, q_vec)
-
-        # Apply term overlap boost
-        q_set = set(q_tokens)
-        candidate_scores = []
-        for idx, chunk in enumerate(self.chunks):
-            if filter_doc_ids and chunk.doc_id not in filter_doc_ids:
-                continue
-
-            score = float(scores[idx])
-            # Boost score if exact keywords match
-            chunk_tokens = set(self._tokenize(chunk.content))
-            overlap = len(q_set.intersection(chunk_tokens))
-            boosted_score = score * 0.7 + (min(overlap / max(1, len(q_set)), 1.0)) * 0.3
-
-            if boosted_score > 0.05:
-                candidate_scores.append((chunk, boosted_score))
-
-        # Sort descending
-        candidate_scores.sort(key=lambda x: x[1], reverse=True)
-        return candidate_scores[:top_k]
-
-    def _gemini_vector_search(
-        self,
-        query: str,
-        top_k: int,
-        filter_doc_ids: Optional[List[str]]
-    ) -> List[Tuple[DocumentChunk, float]]:
-        # Compute embeddings for query and compare against stored embeddings
-        q_emb = self.gemini_client.embed_text(query)
-        if not q_emb:
+        tokens = re.findall(r"[\w]+", query.lower(), flags=re.UNICODE)
+        if not tokens:
             return []
-
-        q_vec = np.array(q_emb, dtype=np.float32)
-        q_norm = np.linalg.norm(q_vec)
-        if q_norm > 0:
-            q_vec /= q_norm
-
+        match = " OR ".join(f'"{token}"' for token in tokens[:32])
+        sql = ("SELECT c.payload, bm25(chunk_search) AS rank FROM chunk_search "
+               "JOIN chunks c ON c.id = chunk_search.chunk_id "
+               "WHERE chunk_search MATCH ?")
+        params = [match]
+        if filter_doc_ids is not None:
+            if not filter_doc_ids:
+                return []
+            sql += f" AND c.doc_id IN ({','.join('?' for _ in filter_doc_ids)})"
+            params.extend(filter_doc_ids)
+        sql += " ORDER BY rank LIMIT ?"
+        params.append(min(top_k, 100))
+        with self._lock:
+            rows = self._connection.execute(sql, params).fetchall()
         results = []
-        for chunk in self.chunks:
-            if filter_doc_ids and chunk.doc_id not in filter_doc_ids:
-                continue
-
-            if chunk.embedding is None:
-                # Lazy embedding
-                chunk.embedding = self.gemini_client.embed_text(chunk.content[:1000])
-
-            if chunk.embedding:
-                c_vec = np.array(chunk.embedding, dtype=np.float32)
-                c_norm = np.linalg.norm(c_vec)
-                if c_norm > 0:
-                    c_vec /= c_norm
-                sim = float(np.dot(q_vec, c_vec))
-                results.append((chunk, sim))
-
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results[:top_k]
+        query_terms = set(tokens)
+        for row in rows:
+            chunk = DocumentChunk.model_validate_json(row[0])
+            chunk_terms = set(re.findall(r"[\w]+", chunk.content.lower(), flags=re.UNICODE))
+            coverage = len(query_terms & chunk_terms) / len(query_terms)
+            results.append((chunk, round(coverage, 3)))
+        return results

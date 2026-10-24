@@ -13,14 +13,14 @@ class DocumentRetrievalTool:
     def __init__(self, vector_store: VectorStore):
         self.vector_store = vector_store
         self.name = "document_retrieval"
-        self.description = "Searches user-uploaded documents (PDFs, TXT, MD) using semantic vector search."
+        self.description = "Searches indexed user documents using SQLite full-text search."
 
     def execute(self, query: str, top_k: int = 3, filter_doc_ids: Optional[List[str]] = None) -> Dict[str, Any]:
         results = self.vector_store.similarity_search(query=query, top_k=top_k, filter_doc_ids=filter_doc_ids)
         if not results:
             return {
                 "found": 0,
-                "message": "No matching document excerpts found for this query in the vector database.",
+                "message": "No matching document excerpts found for this query.",
                 "chunks": []
             }
 
@@ -28,6 +28,7 @@ class DocumentRetrievalTool:
         for chunk, score in results:
             extracted.append({
                 "chunk_id": chunk.id,
+                "doc_id": chunk.doc_id,
                 "doc_name": chunk.doc_name,
                 "page": chunk.page_number,
                 "content": chunk.content,
@@ -50,14 +51,18 @@ class WebSearchTool:
         self._headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
+        self._wiki_headers = {
+            "User-Agent": "InsightPilot/1.0 (https://github.com/Manas-Jain-24/insightpilot; research@insightpilot.ai)"
+        }
 
     async def execute_async(self, query: str, num_results: int = 3) -> Dict[str, Any]:
         results = []
 
         # Strategy 1: Live DuckDuckGo API (Abstract + Related Topics)
         try:
+            clean_q = re.sub(r'site:\S+', '', query).strip()
             async with httpx.AsyncClient(timeout=5.0, headers=self._headers) as client:
-                ddg_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json&no_html=1&skip_disambig=1"
+                ddg_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(clean_q)}&format=json&no_html=1&skip_disambig=1"
                 resp = await client.get(ddg_url)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -85,27 +90,40 @@ class WebSearchTool:
         except Exception:
             pass
 
-        # Strategy 2: Wikipedia OpenSearch API (for authoritative academic and technical summaries)
+        # Strategy 2: Wikipedia Search & Extracts API (for authoritative academic & encyclopedic summaries)
         if len(results) < num_results:
             try:
-                async with httpx.AsyncClient(timeout=4.0, headers=self._headers) as client:
-                    clean_q = re.sub(r"[^\w\s]", "", query).strip()
-                    search_url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(clean_q)}&limit={num_results}&namespace=0&format=json"
-                    resp = await client.get(search_url)
+                clean_term = re.sub(r'site:\S+', '', query).strip()
+                clean_term = re.sub(r'[^\w\s]', ' ', clean_term).strip()
+                words = [w for w in clean_term.split() if len(w) > 2]
+                search_term = " ".join(words[:6]) if len(words) > 6 else clean_term
+
+                async with httpx.AsyncClient(timeout=5.0, headers=self._wiki_headers) as client:
+                    wiki_params = {
+                        "action": "query",
+                        "format": "json",
+                        "generator": "search",
+                        "gsrsearch": search_term,
+                        "gsrlimit": num_results,
+                        "prop": "extracts",
+                        "exintro": 1,
+                        "explaintext": 1,
+                        "exsentences": 3
+                    }
+                    resp = await client.get("https://en.wikipedia.org/w/api.php", params=wiki_params)
                     if resp.status_code == 200:
                         data = resp.json()
-                        titles = data[1] if len(data) > 1 else []
-                        snippets = data[2] if len(data) > 2 else []
-                        urls = data[3] if len(data) > 3 else []
-
-                        for i in range(len(titles)):
+                        pages = data.get("query", {}).get("pages", {})
+                        for pid, page in pages.items():
                             if len(results) >= num_results:
                                 break
-                            if snippets[i]:
+                            title = page.get("title", "")
+                            extract = page.get("extract", "").strip()
+                            if title and extract:
                                 results.append({
-                                    "title": titles[i],
-                                    "snippet": snippets[i],
-                                    "url": urls[i] if i < len(urls) else "https://wikipedia.org"
+                                    "title": title,
+                                    "snippet": extract,
+                                    "url": f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
                                 })
             except Exception:
                 pass
@@ -117,22 +135,12 @@ class WebSearchTool:
                 "results": results[:num_results]
             }
 
-        # Strategy 3: High-utility structured synthesis fallback if network is constrained
+        # A failed search is missing evidence, not a source to cite.
         return {
-            "source": "curated_web_intel",
+            "source": "unavailable",
             "query": query,
-            "results": [
-                {
-                    "title": f"State-of-the-Art Analysis: {query}",
-                    "snippet": f"Consensus analysis indicates significant acceleration in {query}, with focus on architectural efficiency, enterprise integration, and benchmark performance metrics.",
-                    "url": "https://arxiv.org/abs/recent-trends"
-                },
-                {
-                    "title": f"Technical Frameworks & Industry Benchmarks ({query})",
-                    "snippet": f"Leading research groups and industry benchmarks cite operational trade-offs, scalability bottlenecks, and cost-performance frontiers regarding {query}.",
-                    "url": "https://techresearch.org/reports"
-                }
-            ]
+            "results": [],
+            "message": "Live web search returned no usable sources."
         }
 
 
@@ -144,12 +152,9 @@ class DataSynthesisTool:
         self.description = "Aggregates observations across document chunks and web findings into a comparative matrix."
 
     def execute(self, findings: List[str], metrics_to_compare: List[str]) -> Dict[str, Any]:
-        matrix = {}
-        for metric in metrics_to_compare:
-            matrix[metric] = f"Analyzed across {len(findings)} source observations with positive correlation."
         return {
-            "matrix": matrix,
-            "confidence_score": 0.92
+            "matrix": {metric: list(findings) for metric in metrics_to_compare},
+            "source_observations": len(findings)
         }
 
 

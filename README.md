@@ -9,7 +9,7 @@
 [![Pydantic](https://img.shields.io/badge/Pydantic-V2-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
-*An enterprise-grade autonomous AI research engine implementing ReAct agent loops, hybrid vector RAG, tool calling, and live streaming executive synthesis.*
+*A research assistant with document search, web retrieval, tool calling, and live streaming reports.*
 
 [Features](#-key-features) • [Architecture](#-architecture) • [Quickstart](#-quickstart) • [API Specs](#-api-endpoints) • [Resume Highlights](#-cv--resume-highlights)
 
@@ -19,14 +19,14 @@
 
 ## 📌 Executive Overview
 
-**InsightPilot** is an autonomous intelligence agent designed to bridge the gap between unstructured multi-source data (PDFs, research papers, Markdown, live web) and decision-grade executive briefs. 
+**InsightPilot** searches uploaded documents and web sources, then presents cited excerpts for a research question.
 
 Unlike conventional single-turn LLM chatbots that hallucinate citations and suffer from static context limits, InsightPilot deploys a **ReAct (Reasoning + Acting) execution loop**:
 1. **Plans & Deconstructs** complex research queries into atomic sub-goals.
-2. **Retrieves & Reranks** verified document chunks via Hybrid Semantic Vector Search (RAG).
+2. **Retrieves & Ranks** document chunks via SQLite full-text search (RAG).
 3. **Calls External Tools** to ingest real-time web knowledge and state-of-the-art benchmarks.
-4. **Validates & Grounds** every factual claim with verifiable bracketed citations (`[1]`, `[2]`).
-5. **Streams Live Cognition** via Server-Sent Events (SSE) directly to an interactive cyber-themed workstation with dynamic entity knowledge graphs.
+4. **Checks Quotes** selected by Gemini against the cited excerpts. Unsupported selections are dropped.
+5. **Streams Progress** and the resulting source excerpts via Server-Sent Events (SSE).
 
 ---
 
@@ -49,18 +49,18 @@ Unlike conventional single-turn LLM chatbots that hallucinate citations and suff
 │   │          │                       ┌───────────────────────┐                     │   │
 │   │          │                       │       Tool Suite      │                     │   │
 │   │          │                       ├───────────────────────┤                     │   │
-│   │          │                       │ 1. Vector Store RAG   │                     │   │
+│   │          │                       │ 1. Document Search    │                     │   │
 │   │          │                       │ 2. Web Search API     │                     │   │
-│   │          │                       │ 3. Data Synthesizer   │                     │   │
-│   │          │                       │ 4. Knowledge Graph    │                     │   │
+│   │          │                       │ 3. Quote Selector     │                     │   │
+│   │          │                       │ 4. Quote Verifier     │                     │   │
 │   │          │                       └───────────────────────┘                     │   │
 │   │          └───────────────────────────────────┘                                 │   │
 │   └────────────────────────────────────────────────────────────────────────────────┘   │
 │                                           │                                            │
 │                                           ▼                                            │
 │   ┌─────────────────────────────┐   ┌─────────────────────────────┐   ┌─────────────────────────────┐
-│   │   Hybrid Vector Database    │   │      Gemini 3.5 / 3.8 Flash │   │      Persistent SQLite DB   │
-│   │ (pypdf + TF-IDF/Cosine Sim) │   │ (google-genai / Simulator)  │   │   (WAL Mode / Auto-Save)    │
+│   │  SQLite Document Search     │   │      Gemini (optional)       │   │      Persistent SQLite DB   │
+│   │ (pypdf + SQLite FTS5/BM25) │   │ (google-genai / Extractive) │   │   (WAL Mode / Auto-Save)    │
 │   └─────────────────────────────┘   └─────────────────────────────┘   └─────────────────────────────┘
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
                                            │
@@ -69,9 +69,8 @@ Unlike conventional single-turn LLM chatbots that hallucinate citations and suff
 │                                 Frontend Workstation                                   │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │  • Live Agent Cognitive Trace (Thought ➔ Action ➔ Observation)                         │
-│  • Grounded Executive Summary with Interactive Clickable Citation Modals               │
-│  • Dynamic Comparative Matrix Table & Strategic Implications                           │
-│  • HTML5 Canvas Animated Concept Knowledge Graph                                       │
+│  • Source Excerpts with Interactive Clickable Citation Modals                           │
+│  • Report History and Export                                                             │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -80,17 +79,18 @@ Unlike conventional single-turn LLM chatbots that hallucinate citations and suff
 ## ✨ Key Features
 
 - **Autonomous ReAct Agent Loop**: Explicit cognitive decomposition where the agent reasons, invokes tools, observes results, and evaluates completion.
-- **Hybrid Retrieval-Augmented Generation (RAG)**:
+- **Indexed Retrieval-Augmented Generation (RAG)**:
   - Multi-format ingestion (`.pdf`, `.md`, `.txt`, `.json`, `.csv`) with recursive sliding-window chunking and sentence boundary preservation.
-  - Cosine vector similarity search with semantic keyword boost and page-level source tracking.
-- **Strict Citation Grounding**: Eliminates hallucinations by anchoring every finding to verified document excerpts or web citations with relevance scores.
+  - Persistent SQLite FTS5 search with BM25 ranking and page-level source tracking.
+- **Quote Verification**: Gemini selects excerpts, and the server accepts only substantial quotes copied from the matching cited source. Unsupported selections are dropped; if all fail, the report falls back to source excerpts.
+- **Source Viewer**: Document citations open the indexed passage with a highlighted quote. Uploaded PDFs are retained locally and open at the cited page beside the passage. Older PDFs uploaded before this feature need to be uploaded again for preview.
+- **Evaluation Dashboard**: A 36-question local benchmark reports hit@1, hit@3, source match, abstention, reciprocal rank, and retrieval latency. The dataset and every case result are visible in the app.
 - **Persistent SQLite Storage & Session History**: Auto-saves research briefs to local SQLite with a responsive History Drawer for 1-click reload, search, and deletion across restarts.
-- **Live Multi-Source Web Crawling**: Dynamically queries DuckDuckGo and Wikipedia APIs for real-time external benchmarks and current events.
+- **Live Web Retrieval**: Queries DuckDuckGo and Wikipedia APIs. If neither returns a source, the report states that no evidence was found.
 - **Real-Time SSE Streaming**: Async generator architecture streaming incremental thoughts, tool latency, and final report JSON to the client.
-- **Dual-Mode Engine (Production + Demo)**:
-  - *Live Mode*: Direct integration with Google's `gemini-3.8-flash` via the official `google-genai` SDK.
-  - *Autonomous Demo Mode*: Built-in high-fidelity intelligence fallback ensuring recruiters can test immediately without setting up API keys.
-- **Interactive Knowledge Graph**: Canvas-rendered radial entity graph displaying conceptual dependencies and relationships.
+- **Optional Gemini Selection**:
+  - *Gemini Mode*: Uses the configured model to select evidence; the server checks each selected quote against its citation.
+  - *No-key Mode*: Produces an extractive report from available sources, or an explicit no-evidence result.
 - **Export Capabilities**: 1-click export to Markdown (`.md`) or printable PDF format.
 
 ---
@@ -122,7 +122,9 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and paste your GEMINI_API_KEY (Optional)
 ```
-> *Note: If no API key is set, InsightPilot automatically launches in High-Fidelity Autonomous Demo Mode so you can demonstrate the full application instantly.*
+> *Note: An API key is optional. Without one, InsightPilot displays source excerpts rather than generating unsupported analysis. Uploaded documents persist in `data/documents.db` across restarts. Uploads are limited to 10 MB.*
+
+Open **Evaluation** in the top bar to run the bundled benchmark. The benchmark uses [`evaluation/questions.json`](evaluation/questions.json) and the two sample documents. It measures retrieval behavior; it does not establish whether statements in those sample documents are true.
 
 ### 3. Launch the Server
 
@@ -141,10 +143,10 @@ Interactive API Docs (Swagger): **`http://127.0.0.1:8080/docs`**
 
 | Dimension | Prompting ChatGPT / Gemini Web | InsightPilot Autonomous Agent Architecture |
 | :--- | :--- | :--- |
-| **Citations & Verification** | **Probabilistic token prediction**: LLMs hallucinate non-existent URLs (404s), fake DOI papers, and wrong page references when asked to "cite sources". | **Deterministic software retrieval**: Citations are extracted directly from vector chunks and live API payloads. Fake citations cannot physically appear. |
-| **Data Privacy & Governance** | Data enters external third-party chat systems, risking exposure of proprietary internal documentation or NDA contracts. | **100% Local / Self-Hosted Sovereignty**: All documents, chunks, and SQLite session history stay securely within your infrastructure boundary. |
+| **Citations & Verification** | Generated citations need source checking. | The server accepts selected quotes only when they occur in the matching retrieved excerpt. This verifies attribution, not the truth of an external source. |
+| **Data Privacy & Governance** | Review data handling before uploading sensitive material. | Documents and history are stored locally. Using Gemini or web search sends request data to external services. |
 | **Execution Paradigm** | **Single-turn black-box completion**: Gives a one-off linear best guess without showing intermediate reasoning. | **Autonomous ReAct Agent Loop**: Explicit cognitive decomposition (`Thought ➔ Action ➔ Observation`) with dynamic tool selection and live SSE streaming. |
-| **Output Structure** | Unstructured markdown text walls requiring manual reformatting and parsing. | **Strictly Typed Pydantic Data Contract**: Executive summaries, ranked findings, comparative matrix tables, strategic takeaways, and HTML5 Canvas knowledge graphs. |
+| **Output Structure** | Free-form prose can be difficult to audit. | **Typed Pydantic Report**: Source excerpts, citation records, and verification status. |
 | **Enterprise Integration** | Cannot be integrated programmatically into microservices, CI/CD, or automated ETL workflows. | **Production FastAPI REST & SSE API**: Programmatic endpoints for document ingestion, streaming research, and SQLite persistent report querying. |
 
 ---
@@ -155,13 +157,14 @@ Interactive API Docs (Swagger): **`http://127.0.0.1:8080/docs`**
 python -m unittest tests/test_agent.py
 ```
 
-All 6 core unit and integration tests verify:
+The automated tests verify:
 - Semantic chunking & PDF text extraction.
-- Vector store indexing & cosine similarity retrieval.
+- Persistent SQLite full-text indexing and retrieval.
 - Multi-strategy web search tool execution.
 - Knowledge graph entity building.
 - ReAct orchestrator event streaming.
 - SQLite database persistent storage & CRUD operations.
+- PDF source retention, citation source lookup, and benchmark repeatability.
 
 ---
 
@@ -169,10 +172,13 @@ All 6 core unit and integration tests verify:
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/health` | Healthcheck, model configuration & vector index stats |
-| `POST` | `/api/documents/upload` | Multipart file upload (PDF/TXT/MD/JSON/CSV) & vector chunking |
+| `GET` | `/api/health` | Healthcheck, model configuration & document index stats |
+| `POST` | `/api/documents/upload` | Multipart file upload (PDF/TXT/MD/JSON/CSV) & search indexing |
 | `GET` | `/api/documents` | List all indexed document metadata |
-| `DELETE` | `/api/documents/{id}` | Delete document from vector database |
+| `GET` | `/api/documents/{id}/file` | Open a retained PDF source |
+| `GET` | `/api/documents/{id}/chunks/{chunk_id}` | Retrieve an indexed source passage |
+| `DELETE` | `/api/documents/{id}` | Delete document from search index |
+| `GET` | `/api/evaluation` | Run the bundled retrieval benchmark |
 | `POST` | `/api/research/stream` | Server-Sent Events (SSE) streaming ReAct research loop |
 | `GET` | `/api/reports` | List all saved research reports from persistent SQLite |
 | `GET` | `/api/reports/{id}` | Retrieve full structured research report by ID |
@@ -186,12 +192,12 @@ All 6 core unit and integration tests verify:
 
 Here is how you can describe this project on your resume:
 
-> **InsightPilot | Autonomous Multimodal Research & Knowledge Agent** *(Python, FastAPI, Gemini API, RAG, Pydantic, Vector Search)*
-> - Engineered an autonomous research agent in FastAPI implementing the ReAct framework to decompose complex research questions into multi-step planning, tool-calling, and evidence synthesis.
-> - Developed a hybrid Retrieval-Augmented Generation (RAG) pipeline with semantic sentence chunking and vector cosine similarity over user-uploaded PDFs and documents.
-> - Architected a real-time Server-Sent Events (SSE) streaming engine displaying sub-second cognitive traces (Thought ➔ Action ➔ Observation) and dynamic HTML5 Canvas knowledge graphs.
-> - Enforced 100% citation grounding with bracketed source verification, reducing hallucination rates and generating structured executive reports with comparative matrices.
-> - Implemented comprehensive Pydantic V2 data contracts, async error handling, and unit test suites achieving full test coverage across agent components.
+> **InsightPilot | Research & Source Verification Assistant** *(Python, FastAPI, Gemini API, SQLite FTS5, Pydantic)*
+> - Built a FastAPI research workflow that plans queries, searches documents and web sources, and streams progress to the browser.
+> - Developed a Retrieval-Augmented Generation (RAG) pipeline with sentence chunking and persistent SQLite full-text search over uploaded documents.
+> - Added Server-Sent Events (SSE) streaming for tool actions and retrieved citations.
+> - Added exact-quote verification for Gemini-selected evidence, an extractive fallback, and explicit no-evidence results.
+> - Used Pydantic V2 models and automated tests for retrieval, uploads, persistence, and report validation.
 
 ---
 
