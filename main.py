@@ -18,4 +18,5 @@ if __name__ == "__main__":
     print(f"  Live Server running at: http://{host}:{port}")
     print(f"  API Documentation at:  http://{host}:{port}/docs")
     print("=" * 55 + "\n")
-    uvicorn.run("backend.app:app", host=host, port=port, reload=True)
+    uvicorn.run("backend.app:app", host=host, port=port,
+                reload=os.environ.get("DEBUG", "false").lower() == "true")

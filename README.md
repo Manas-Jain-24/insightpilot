@@ -137,6 +137,16 @@ Interactive API Docs (Swagger): **`http://127.0.0.1:8080/docs`**
 
 ---
 
+## 🌐 Public Portfolio Deployment
+
+The included [`render.yaml`](render.yaml) deploys a single public demo service on Render. Connect this repository as a **Blueprint** in the Render dashboard and approve creation of the `insightpilot-demo` web service. The Blueprint installs dependencies, starts `uvicorn backend.app:app` on Render's port, checks `/api/health`, and waits for CI checks before automatic deploys. Python 3.13 is selected in [`.python-version`](.python-version).
+
+The deployed service sets `APP_MODE=demo`. This mode indexes only the bundled sample documents in memory, including a small PDF for the **Try PDF Source Viewer** quick pick. Visitors can run research, inspect sources, run the retrieval evaluation, print reports, and download Markdown. Uploads, document and report deletion, saved report history, and visitor supplied Gemini keys are disabled. It uses no paid Gemini API key and stores no visitor research after a restart. Research and evaluation requests have single-process rate limits. Do not set `APP_MODE=local` on a public service: that mode has shared uploads and reports without accounts.
+
+For local editing, leave `APP_MODE=local` in `.env` (or unset it) and run `python main.py`. Local mode stores documents and reports in two SQLite files under `data/`. Set `DATA_DIR` if you want both files on a different persistent directory. A hosted service that allows private user uploads needs authentication, per-user document access, abuse controls, and durable storage before enabling local mode features for visitors.
+
+CI runs backend tests and JavaScript syntax checks on pushes and pull requests. Direct Python dependencies are pinned in `requirements.txt`. Check the **Actions** tab before deploying a change. After Render deploys, visit `/api/health` and run a sample research query to confirm the live service.
+
 ---
 
 ## 💡 Why InsightPilot vs. ChatGPT or Public Chatbots?

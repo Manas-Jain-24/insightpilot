@@ -14,7 +14,7 @@ class Database:
     def __init__(self, db_path: Optional[str] = None):
         if not db_path:
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            data_dir = os.path.join(base_dir, "data")
+            data_dir = os.environ.get("DATA_DIR") or os.path.join(base_dir, "data")
             os.makedirs(data_dir, exist_ok=True)
             db_path = os.path.join(data_dir, "insightpilot.db")
 

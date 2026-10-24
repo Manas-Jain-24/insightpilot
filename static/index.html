@@ -57,6 +57,7 @@
       <div class="hero-header">
         <h2>Autonomous Multimodal Research & Knowledge Synthesis</h2>
         <p>Enter a research question. InsightPilot searches your documents and, if enabled, the web, then shows a source-backed report.</p>
+        <p id="demoNotice" hidden>Public demo: research uses bundled sample documents. Uploads and saved history are available when running locally.</p>
       </div>
 
       <div class="prompt-box">
@@ -107,6 +108,9 @@
         <span class="chip-tag" data-query="Analyze recent breakthroughs in quantum error correction and industry migration timelines for NIST Post-Quantum Cryptography.">
           ⚛️ Quantum & PQC Standards
         </span>
+        <span class="chip-tag" data-query="How does the InsightPilot source viewer highlight a cited PDF passage?">
+          📄 Try PDF Source Viewer
+        </span>
       </div>
     </section>
 
@@ -134,7 +138,7 @@
           <div class="step-card">
             <div class="step-badge">2</div>
             <div class="step-info">
-              <h4>Vector Store RAG Retrieval</h4>
+              <h4>Indexed Document Retrieval</h4>
               <p>Find matching excerpts from documents</p>
             </div>
           </div>
@@ -253,7 +257,7 @@
   <div class="modal-backdrop" id="docsModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>📁 Ingested Documents & RAG Vector Index</h3>
+        <h3>📁 Indexed Documents</h3>
         <button class="close-btn" id="btnCloseDocs">&times;</button>
       </div>
 
@@ -264,7 +268,7 @@
         <input type="file" id="fileInput" accept=".pdf,.txt,.md,.json,.csv" style="display: none;">
       </div>
 
-      <h4 style="margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-muted);">Currently Indexed in Vector Store:</h4>
+      <h4 style="margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-muted);">Currently indexed:</h4>
       <div class="file-list" id="docsListContainer">
         <div style="font-size: 0.85rem; color: var(--text-muted);">Loading documents...</div>
       </div>
@@ -289,11 +293,8 @@
           placeholder="AIzaSy..." 
           style="width: 100%; padding: 0.65rem 0.85rem; background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #fff; font-family: var(--font-mono); font-size: 0.85rem;"
         >
-        <label style="display: block; margin-top: 0.65rem; font-size: 0.8rem;">
-          <input type="checkbox" id="rememberApiKey"> Remember key in this browser
-        </label>
         <p style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.4rem;">
-          With a Gemini key, InsightPilot selects source quotes and checks them against retrieved excerpts. Without a key, it shows source excerpts. If no sources are found, it says so.
+          A key entered here is used for this browser session only. Without a key, InsightPilot shows source excerpts. If no sources are found, it says so.
         </p>
       </div>
 

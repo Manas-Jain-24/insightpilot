@@ -10,6 +10,7 @@ let isRunning = false;
 let startTime = null;
 let timerInterval = null;
 let kgAnimationId = null;
+let appConfig = { mode: "local", uploads_enabled: true, history_enabled: true, visitor_api_keys_enabled: true };
 
 // DOM Elements
 const queryInput = document.getElementById("queryInput");
@@ -68,11 +69,22 @@ const sourceModal = document.getElementById("sourceModal");
 const evaluationModal = document.getElementById("evaluationModal");
 
 // Initialize on page load
-document.addEventListener("DOMContentLoaded", () => {
-  loadDocuments();
-  loadHistory();
+document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
-  loadSavedApiKey();
+  try {
+    const response = await fetch("/api/config");
+    if (response.ok) appConfig = await response.json();
+  } catch (error) {
+    console.error("Could not load app configuration:", error);
+  }
+  if (appConfig.mode === "demo") {
+    document.getElementById("demoNotice").hidden = false;
+    btnOpenHistory.style.display = "none";
+    btnOpenSettings.style.display = "none";
+    fileDropzone.style.display = "none";
+  }
+  loadDocuments();
+  if (appConfig.history_enabled) loadHistory();
 });
 
 function setupEventListeners() {
@@ -147,26 +159,12 @@ function setupEventListeners() {
 
   // Save Settings
   btnSaveSettings.addEventListener("click", () => {
-    const key = apiKeyInput.value.trim();
-    if (key && document.getElementById("rememberApiKey").checked) {
-      localStorage.setItem("insightpilot_gemini_key", key);
-    } else {
-      localStorage.removeItem("insightpilot_gemini_key");
-    }
     settingsModal.classList.remove("open");
   });
 
   // Exports
   btnExportMarkdown.addEventListener("click", exportReportMarkdown);
   btnPrintReport.addEventListener("click", () => window.print());
-}
-
-function loadSavedApiKey() {
-  const savedKey = localStorage.getItem("insightpilot_gemini_key");
-  if (savedKey) {
-    apiKeyInput.value = savedKey;
-    document.getElementById("rememberApiKey").checked = true;
-  }
 }
 
 // ---------------- Document Ingestion ----------------
@@ -189,11 +187,11 @@ async function loadDocuments() {
           <div>
             <strong>${escapeHtml(doc.filename)}</strong>
             <div style="font-size: 0.72rem; color: var(--text-muted);">
-              ${doc.file_type} • ${Math.round(doc.size_bytes / 1024)} KB • ${doc.chunks_count} vector chunks
+              ${doc.file_type} • ${Math.round(doc.size_bytes / 1024)} KB • ${doc.chunks_count} indexed ${doc.chunks_count === 1 ? "chunk" : "chunks"}
             </div>
           </div>
         </div>
-        <button class="delete-file-btn" onclick="deleteDoc('${doc.id}')" title="Delete document">✕</button>
+        ${appConfig.uploads_enabled ? `<button class="delete-file-btn" onclick="deleteDoc('${doc.id}')" title="Delete document">✕</button>` : ""}
       </div>
     `).join("");
   } catch (err) {
@@ -202,6 +200,7 @@ async function loadDocuments() {
 }
 
 async function handleFileUpload(file) {
+  if (!appConfig.uploads_enabled) return;
   const formData = new FormData();
   formData.append("file", file);
 
@@ -278,7 +277,7 @@ async function launchAgentResearch() {
       body: JSON.stringify({
         query: query,
         depth: depth,
-        api_key: apiKey,
+        api_key: appConfig.visitor_api_keys_enabled ? apiKey : null,
         use_documents: useDocs,
         search_web: useWeb
       })
@@ -737,21 +736,36 @@ function renderKnowledgeGraph(kg) {
 async function exportReportMarkdown() {
   if (!currentReport) return;
   try {
-    const res = await fetch("/api/export/markdown", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(currentReport)
-    });
-    if (res.ok) {
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `InsightPilot_Report_${currentReport.id}.md`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+    let blob;
+    if (appConfig.mode === "demo") {
+      const lines = [`# ${currentReport.query}`, "", currentReport.executive_summary, ""];
+      for (const finding of currentReport.key_findings || []) {
+        lines.push(`## ${finding.heading}`, finding.content, "");
+      }
+      if (currentReport.citations?.length) {
+        lines.push("## Sources", "");
+        for (const cite of currentReport.citations) {
+          lines.push(`- [${cite.id}] ${cite.title}${cite.url_or_page ? ` — ${cite.url_or_page}` : ""}`);
+        }
+      }
+      blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    } else {
+      const res = await fetch("/api/export/markdown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentReport)
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      blob = await res.blob();
     }
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `InsightPilot_Report_${currentReport.id}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
   } catch (err) {
     console.error("Export error:", err);
   }
@@ -769,6 +783,7 @@ function escapeHtml(str) {
 
 // ---------------- Research History (SQLite) ----------------
 async function loadHistory() {
+  if (!appConfig.history_enabled) return;
   try {
     const res = await fetch("/api/reports");
     if (!res.ok) return;

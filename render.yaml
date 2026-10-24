@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: insightpilot-demo
+    runtime: python
+    plan: free
+    autoDeployTrigger: checksPass
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_MODE
+        value: demo
+      - key: PYTHON_VERSION
+        value: 3.13.5

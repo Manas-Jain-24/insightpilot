@@ -9,7 +9,7 @@ class GeminiClient:
     """Interfaces with Gemini (gemini-3.5-flash-lite / gemini-3.8-flash) via google-genai SDK with autonomous function calling and fallback intelligence."""
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "").strip()
+        self.api_key = (api_key if api_key is not None else os.environ.get("GEMINI_API_KEY", "")).strip()
         self.model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
         self._client = None
         self._init_sdk()

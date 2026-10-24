@@ -14,10 +14,10 @@ class VectorStore:
 
     def __init__(self, gemini_client=None, db_path: Optional[str] = None):
         self.gemini_client = gemini_client
-        self.db_path = db_path or os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "data", "documents.db"
+        data_dir = os.environ.get("DATA_DIR") or os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
         )
+        self.db_path = db_path or os.path.join(data_dir, "documents.db")
         if self.db_path != ":memory:":
             os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
         self._lock = threading.RLock()
