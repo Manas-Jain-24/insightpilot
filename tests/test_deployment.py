@@ -55,11 +55,29 @@ with TestClient(app) as client:
 """
         env = os.environ.copy()
         env["APP_MODE"] = "demo"
-        env["GEMINI_API_KEY"] = "unused-in-demo"
+        env["GEMINI_API_KEY"] = ""
         result = subprocess.run(
             [sys.executable, "-c", script], cwd=ROOT, env=env,
             capture_output=True, text=True, timeout=30
         )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_demo_mode_uses_server_key_without_accepting_visitor_keys(self):
+        script = """
+from fastapi.testclient import TestClient
+from backend.app import app
+with TestClient(app) as client:
+    assert client.get('/api/health').json()['gemini_api_configured'] is True
+    config = client.get('/api/config').json()
+    assert config['model_enabled'] is True
+    assert config['visitor_api_keys_enabled'] is False
+    assert client.post('/api/research/stream', json={'query': 'NIST quantum', 'api_key': 'visitor-key'}).status_code == 403
+"""
+        env = os.environ.copy()
+        env["APP_MODE"] = "demo"
+        env["GEMINI_API_KEY"] = "server-test-key"
+        result = subprocess.run([sys.executable, "-c", script], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_demo_rate_limit_resets_after_window(self):

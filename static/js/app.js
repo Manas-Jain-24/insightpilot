@@ -78,7 +78,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("Could not load app configuration:", error);
   }
   if (appConfig.mode === "demo") {
-    document.getElementById("demoNotice").hidden = false;
+    const demoNotice = document.getElementById("demoNotice");
+    demoNotice.hidden = false;
+    demoNotice.textContent = appConfig.model_enabled
+      ? "Public demo: research uses the server's Gemini key and bundled sample documents. Uploads and saved history are available when running locally."
+      : "Public demo: answers are selected from source excerpts. Broad comparisons and current events need stronger sources or a configured model. Uploads and saved history are available when running locally.";
     btnOpenHistory.style.display = "none";
     btnOpenSettings.style.display = "none";
     fileDropzone.style.display = "none";

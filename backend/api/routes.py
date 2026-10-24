@@ -62,7 +62,8 @@ def create_router(
     @router.get("/config")
     def public_config():
         return {"mode": mode, "uploads_enabled": mode != "demo",
-                "history_enabled": bool(db), "visitor_api_keys_enabled": mode != "demo"}
+                "history_enabled": bool(db), "visitor_api_keys_enabled": mode != "demo",
+                "model_enabled": gemini_client.has_api_key()}
 
     @router.get("/evaluation")
     def evaluation(request: Request):

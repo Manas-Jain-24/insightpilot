@@ -122,7 +122,7 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and paste your GEMINI_API_KEY (Optional)
 ```
-> *Note: An API key is optional. Without one, InsightPilot displays source excerpts rather than generating unsupported analysis. Uploaded documents persist in `data/documents.db` across restarts. Uploads are limited to 10 MB.*
+> *Note: An API key is optional. A key in `.env` stays on the server and is used in local or demo mode. Without one, InsightPilot displays source excerpts. Uploaded documents persist in `data/documents.db` across restarts in local mode. Uploads are limited to 10 MB.*
 
 Open **Evaluation** in the top bar to run the bundled benchmark. The benchmark uses [`evaluation/questions.json`](evaluation/questions.json) and the two sample documents. It measures retrieval behavior; it does not establish whether statements in those sample documents are true.
 
@@ -141,7 +141,7 @@ Interactive API Docs (Swagger): **`http://127.0.0.1:8080/docs`**
 
 The included [`render.yaml`](render.yaml) deploys a single public demo service on Render. Connect this repository as a **Blueprint** in the Render dashboard and approve creation of the `insightpilot-demo` web service. The Blueprint installs dependencies, starts `uvicorn backend.app:app` on Render's port, checks `/api/health`, and waits for CI checks before automatic deploys. Python 3.13 is selected in [`.python-version`](.python-version).
 
-The deployed service sets `APP_MODE=demo`. This mode indexes only the bundled sample documents in memory, including a small PDF for the **Try PDF Source Viewer** quick pick. Visitors can run research, inspect sources, run the retrieval evaluation, print reports, and download Markdown. Uploads, document and report deletion, saved report history, and visitor supplied Gemini keys are disabled. It uses no paid Gemini API key and stores no visitor research after a restart. Research and evaluation requests have single-process rate limits. Do not set `APP_MODE=local` on a public service: that mode has shared uploads and reports without accounts.
+The deployed service sets `APP_MODE=demo`. This mode indexes only the bundled sample documents in memory, including a small PDF for the **Try PDF Source Viewer** quick pick. Visitors can run research, inspect sources, run the retrieval evaluation, print reports, and download Markdown. Uploads, document and report deletion, saved report history, and visitor supplied Gemini keys are disabled. A server-side `GEMINI_API_KEY` is used when configured; the included Render Blueprint does not set one. Model calls can incur usage charges. The service stores no visitor research after a restart. Research and evaluation requests have single-process rate limits. Do not set `APP_MODE=local` on a public service: that mode has shared uploads and reports without accounts.
 
 For local editing, leave `APP_MODE=local` in `.env` (or unset it) and run `python main.py`. Local mode stores documents and reports in two SQLite files under `data/`. Set `DATA_DIR` if you want both files on a different persistent directory. A hosted service that allows private user uploads needs authentication, per-user document access, abuse controls, and durable storage before enabling local mode features for visitors.
 

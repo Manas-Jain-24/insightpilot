@@ -29,9 +29,9 @@ app_mode = os.environ.get("APP_MODE", "local").strip().lower()
 if app_mode not in {"local", "demo"}:
     raise RuntimeError("APP_MODE must be 'local' or 'demo'")
 
-# The public demo has no mutable document or report store and makes no paid model calls.
+# Demo mode keeps its read-only, in-memory stores. A server-side Gemini key is optional.
 vector_store = VectorStore(db_path=":memory:" if app_mode == "demo" else None)
-gemini_client = GeminiClient(api_key="" if app_mode == "demo" else None)
+gemini_client = GeminiClient()
 db = None if app_mode == "demo" else Database()
 
 
