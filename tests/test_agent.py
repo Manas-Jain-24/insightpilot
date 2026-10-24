@@ -46,6 +46,17 @@ class TestInsightPilot(unittest.TestCase):
         self.assertIn("NIST", best_chunk.content)
         self.assertGreater(score, 0.0)
 
+    def test_document_retrieval_ignores_question_filler_and_loose_keyword_hits(self):
+        from backend.models import DocumentMetadata, DocumentChunk
+
+        metadata = DocumentMetadata(id="doc-off-topic", filename="notes.txt", file_type="TXT",
+                                    size_bytes=80, chunks_count=1)
+        chunk = DocumentChunk(id="chunk-off-topic", doc_id=metadata.id,
+                              doc_name=metadata.filename, chunk_index=0,
+                              content="This note asks what is new in astronomy and discusses ancient stars.")
+        self.vector_store.add_document(metadata, [chunk])
+        self.assertEqual(DocumentRetrievalTool(self.vector_store).execute("What is photosynthesis?")["found"], 0)
+
     def test_web_search_tool_async(self):
         transport = httpx.MockTransport(lambda request: httpx.Response(200, json={
             "Heading": "Quantum computing", "AbstractText": "Quantum computers use qubits.",
@@ -104,6 +115,62 @@ class TestInsightPilot(unittest.TestCase):
             self.assertEqual(result["source"], "unavailable")
 
         asyncio.run(run_test())
+
+    def test_web_search_handles_different_question_wording_and_rejects_nearby_topics(self):
+        cases = [
+            ("How does photosynthesis work?", "photosynthesis", "Photosynthesis",
+             "Artificial photosynthesis"),
+            ("What caused the 2008 financial crisis?", "2008 financial crisis",
+             "2008 financial crisis", "2008 Latvian financial crisis"),
+        ]
+
+        for question, expected_search, good_title, bad_title in cases:
+            with self.subTest(question=question):
+                def respond(request):
+                    if "duckduckgo.com" in request.url.host:
+                        return httpx.Response(200, json={"AbstractText": "", "RelatedTopics": []})
+                    self.assertEqual(request.url.params["gsrsearch"], expected_search)
+                    return httpx.Response(200, json={"query": {"pages": {
+                        "2": {"index": 2, "title": bad_title,
+                              "extract": f"{bad_title} is a different subject."},
+                        "1": {"index": 1, "title": good_title,
+                              "extract": f"{good_title} is the subject of this article."},
+                    }}})
+
+                transport = httpx.MockTransport(respond)
+                original_client = httpx.AsyncClient
+
+                async def run_test():
+                    with patch("backend.agent.tools.httpx.AsyncClient",
+                               side_effect=lambda *a, **kw: original_client(transport=transport, **kw)):
+                        return await WebSearchTool().execute_async(question)
+
+                result = asyncio.run(run_test())
+                self.assertEqual([source["title"] for source in result["results"]], [good_title])
+
+    def test_extractive_report_selects_sentence_that_answers_causal_question(self):
+        from backend.models import Citation
+
+        source = Citation(
+            id=1, source_type="web", title="2008 financial crisis",
+            snippet="The 2008 financial crisis affected many countries. "
+                    "The first phase was the subprime mortgage crisis, as mortgage-backed securities collapsed in value."
+        )
+        report = GeminiClient(api_key="").synthesize_final_report(
+            "What caused the 2008 financial crisis?", [], [source]
+        )
+        self.assertIn("subprime mortgage crisis", report.executive_summary)
+        self.assertEqual(report.key_findings[0].citations, [1])
+
+    def test_extractive_report_does_not_pretend_to_compare_one_sided_evidence(self):
+        from backend.models import Citation
+
+        source = Citation(id=1, source_type="web", title="Web development",
+                          snippet="JavaScript is widely used for front-end web development.")
+        report = GeminiClient(api_key="").synthesize_final_report(
+            "Compare Python and JavaScript for web development", [], [source]
+        )
+        self.assertEqual(report.metrics["mode"], "no_evidence")
 
     def test_web_failure_does_not_invent_sources(self):
         transport = httpx.MockTransport(lambda request: httpx.Response(503))

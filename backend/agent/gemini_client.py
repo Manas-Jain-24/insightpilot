@@ -3,6 +3,7 @@ import json
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from backend.models import PlanStep, Citation, Finding, ResearchReport
+from backend.agent.relevance import best_sentence, coverage, topic_terms
 
 
 class GeminiClient:
@@ -62,7 +63,7 @@ class GeminiClient:
             {
                 "type": "function",
                 "name": "search_web",
-                "description": "Queries external live web knowledge, industry benchmarks, and encyclopedic sources.",
+                "description": "Searches DuckDuckGo Instant Answer and Wikipedia for source excerpts.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -217,8 +218,7 @@ Return an empty list if none qualify.
                     return ResearchReport(
                         query=query,
                         depth=depth,
-                        executive_summary=(f"Found {len(citations)} source excerpt(s) for '{query}'. "
-                                           f"The {len(findings)} finding(s) below are exact text from their cited sources."),
+                        executive_summary=findings[0].content,
                         key_findings=findings,
                         citations=citations,
                         metrics={"model": self.model, "mode": "verified_quotes",
@@ -274,24 +274,36 @@ Return an empty list if none qualify.
         if not citations:
             return ResearchReport(
                 query=query, depth=depth,
-                executive_summary="No matching document excerpts or live web sources were found. Try a different query, upload a relevant document, or enable web search.",
+                executive_summary="No source relevant enough to answer this question was found. Try a narrower question or add a relevant document.",
                 metrics={"mode": "no_evidence"}
             )
 
-        first_source = citations[0]
-        first_excerpt = first_source.snippet.removesuffix("...").strip()
-        first_sentence = re.split(r"(?<=[.!?])\s+", first_excerpt, maxsplit=1)[0]
-        if len(first_sentence) < 40:
-            first_sentence = first_excerpt
-        findings = [Finding(
-            heading=c.title,
-            content=f"{c.snippet} [{c.id}]",
-            citations=[c.id]
-        ) for c in citations[:5]]
+        candidates = []
+        query_terms = topic_terms(query)
+        needs_comparison = bool(re.search(r"\b(compare|comparison|versus|vs|difference)\b", query, re.I))
+        for citation in citations:
+            excerpt = citation.snippet.removesuffix("...").strip()
+            sentence = best_sentence(query, excerpt)
+            if not sentence or not coverage(query_terms, citation.title + " " + sentence):
+                continue
+            if needs_comparison and len(set(query_terms) & set(topic_terms(sentence))) < len(query_terms):
+                continue
+            score = coverage(query_terms, sentence) + 0.25 * coverage(query_terms, citation.title)
+            candidates.append((score, citation, sentence))
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        findings = [Finding(heading=c.title, content=f"{sentence} [{c.id}]", citations=[c.id])
+                    for _, c, sentence in candidates[:3]]
+        if not findings:
+            return ResearchReport(
+                query=query, depth=depth,
+                executive_summary="The retrieved sources do not contain enough relevant text to answer this question.",
+                citations=[], metrics={"mode": "no_evidence"}
+            )
+        used_ids = {finding.citations[0] for finding in findings}
         return ResearchReport(
             query=query, depth=depth,
-            executive_summary=f"{first_sentence} [{first_source.id}]",
+            executive_summary=findings[0].content,
             key_findings=findings,
-            citations=citations,
+            citations=[c for c in citations if c.id in used_ids],
             metrics={"mode": "extractive_fallback"}
         )

@@ -5,6 +5,7 @@ import urllib.parse
 from typing import List, Dict, Any, Optional
 from backend.rag.vector_store import VectorStore
 from backend.models import KnowledgeNode, KnowledgeEdge, KnowledgeGraph
+from backend.agent.relevance import terms, topic_terms, coverage
 
 
 class DocumentRetrievalTool:
@@ -16,7 +17,13 @@ class DocumentRetrievalTool:
         self.description = "Searches indexed user documents using SQLite full-text search."
 
     def execute(self, query: str, top_k: int = 3, filter_doc_ids: Optional[List[str]] = None) -> Dict[str, Any]:
-        results = self.vector_store.similarity_search(query=query, top_k=top_k, filter_doc_ids=filter_doc_ids)
+        query_terms = terms(query)
+        results = self.vector_store.similarity_search(
+            query=" ".join(query_terms), top_k=max(top_k * 4, 12), filter_doc_ids=filter_doc_ids
+        ) if query_terms else []
+        results = [(chunk, coverage(query_terms, chunk.content)) for chunk, _ in results]
+        results = sorted(((chunk, score) for chunk, score in results if score),
+                         key=lambda item: item[1], reverse=True)[:top_k]
         if not results:
             return {
                 "found": 0,
@@ -47,7 +54,7 @@ class WebSearchTool:
 
     def __init__(self):
         self.name = "web_search"
-        self.description = "Performs real-time web knowledge retrieval across news, technical docs, and live encyclopedic sources."
+        self.description = "Retrieves topic summaries from DuckDuckGo Instant Answer and Wikipedia."
         self._headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
@@ -57,37 +64,31 @@ class WebSearchTool:
 
     @staticmethod
     def _terms(text: str) -> List[str]:
-        stop_words = {"a", "an", "and", "about", "are", "can", "define", "explain", "find",
-                      "for", "how", "is", "latest", "me", "of", "on", "please", "show",
-                      "tell", "the", "this", "to", "what", "when", "where", "who", "why"}
-        words = re.findall(r"[a-z0-9]+", text.lower())
-        return [word[:-1] if len(word) > 5 and word.endswith("s") and not word.endswith("ss")
-                else word for word in words if len(word) > 2 and word not in stop_words]
+        return terms(text)
 
     @classmethod
     def _relevance(cls, query_terms: List[str], title: str, snippet: str) -> float:
         if not query_terms:
             return 0.0
         title_terms = set(cls._terms(title))
-        source_terms = title_terms | set(cls._terms(snippet))
-        matches = set(query_terms) & source_terms
-        required = 1 if len(set(query_terms)) == 1 else 2
-        coverage = len(matches) / len(set(query_terms))
-        if len(matches) < required or coverage < 0.5:
+        ratio = coverage(query_terms, title + " " + snippet)
+        title_ratio = len(set(query_terms) & title_terms) / len(set(query_terms))
+        title_precision = len(set(query_terms) & title_terms) / len(title_terms) if title_terms else 0.0
+        if not ratio or title_ratio < 0.8 or title_precision < 0.9:
             return 0.0
-        return coverage + len(set(query_terms) & title_terms) / len(set(query_terms))
+        return ratio + title_ratio + title_precision
 
     async def execute_async(self, query: str, num_results: int = 3) -> Dict[str, Any]:
         num_results = max(1, min(int(num_results), 5))
         results = []
-        query_terms = self._terms(re.sub(r"site:\S+", "", query))[:8]
+        query_terms = topic_terms(query)[:8]
         if not query_terms:
             return {"source": "unavailable", "query": query, "results": [],
                     "message": "Search query has no meaningful terms."}
 
         # Strategy 1: Live DuckDuckGo API (Abstract + Related Topics)
         try:
-            clean_q = re.sub(r'site:\S+', '', query).strip()
+            clean_q = " ".join(query_terms)
             async with httpx.AsyncClient(timeout=5.0, headers=self._headers) as client:
                 ddg_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(clean_q)}&format=json&no_html=1&skip_disambig=1"
                 resp = await client.get(ddg_url)

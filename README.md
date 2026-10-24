@@ -86,11 +86,11 @@ Unlike conventional single-turn LLM chatbots that hallucinate citations and suff
 - **Source Viewer**: Document citations open the indexed passage with a highlighted quote. Uploaded PDFs are retained locally and open at the cited page beside the passage. Older PDFs uploaded before this feature need to be uploaded again for preview.
 - **Evaluation Dashboard**: A 36-question local benchmark reports hit@1, hit@3, source match, abstention, reciprocal rank, and retrieval latency. The dataset and every case result are visible in the app.
 - **Persistent SQLite Storage & Session History**: Auto-saves research briefs to local SQLite with a responsive History Drawer for 1-click reload, search, and deletion across restarts.
-- **Live Web Retrieval**: Queries DuckDuckGo and Wikipedia APIs. If neither returns a source, the report states that no evidence was found.
+- **Web Retrieval**: Queries DuckDuckGo Instant Answer and Wikipedia, checks the topic against source titles, and selects answer-relevant sentences. These sources are best suited to established topics; they do not provide comprehensive current news or a general web search index. If the evidence is insufficient, the report says so.
 - **Real-Time SSE Streaming**: Async generator architecture streaming incremental thoughts, tool latency, and final report JSON to the client.
 - **Optional Gemini Selection**:
   - *Gemini Mode*: Uses the configured model to select evidence; the server checks each selected quote against its citation.
-  - *No-key Mode*: Produces an extractive report from available sources, or an explicit no-evidence result.
+  - *No-key Mode*: Selects relevant sentences from available sources, or returns an explicit no-evidence result. Broad comparisons need directly supporting passages; no-key mode does not invent a comparison from unrelated excerpts.
 - **Export Capabilities**: 1-click export to Markdown (`.md`) or printable PDF format.
 
 ---
