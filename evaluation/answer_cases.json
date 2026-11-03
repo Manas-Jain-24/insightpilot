@@ -1,0 +1,38 @@
+[
+  {
+    "query": "What is a heckler's veto?",
+    "sources": [{"title": "Heckler's veto", "snippet": "A heckler's veto occurs when a hostile audience prevents a speaker from being heard."}],
+    "expected_phrase": "hostile audience",
+    "abstain": false
+  },
+  {
+    "query": "How does photosynthesis work?",
+    "sources": [{"title": "Photosynthesis", "snippet": "Photosynthesis is the process by which plants convert sunlight into chemical energy."}],
+    "expected_phrase": "convert sunlight",
+    "abstain": false
+  },
+  {
+    "query": "What caused the 2008 financial crisis?",
+    "sources": [{"title": "2008 financial crisis", "snippet": "The crisis affected banks worldwide. The first phase was the subprime mortgage crisis, as mortgage-backed securities collapsed in value."}],
+    "expected_phrase": "subprime mortgage crisis",
+    "abstain": false
+  },
+  {
+    "query": "What does ReAct combine?",
+    "sources": [{"title": "ReAct research", "snippet": "The ReAct framework combines reasoning with actions and tool observations during problem solving."}],
+    "expected_phrase": "reasoning with actions",
+    "abstain": false
+  },
+  {
+    "query": "Compare Python and JavaScript for web development",
+    "sources": [{"title": "JavaScript", "snippet": "JavaScript is commonly used in browser-based web development."}],
+    "expected_phrase": "",
+    "abstain": true
+  },
+  {
+    "query": "What is the cosmic toaster protocol?",
+    "sources": [],
+    "expected_phrase": "",
+    "abstain": true
+  }
+]

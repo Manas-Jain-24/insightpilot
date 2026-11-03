@@ -19,7 +19,7 @@
 
 ## 📌 Executive Overview
 
-**InsightPilot** searches uploaded documents and web sources, then presents cited excerpts for a research question.
+**InsightPilot** searches uploaded documents and web sources, then writes a concise answer with cited evidence for a research question.
 
 Unlike conventional single-turn LLM chatbots that hallucinate citations and suffer from static context limits, InsightPilot deploys a **ReAct (Reasoning + Acting) execution loop**:
 1. **Plans & Deconstructs** complex research queries into atomic sub-goals.
@@ -86,10 +86,11 @@ Unlike conventional single-turn LLM chatbots that hallucinate citations and suff
 - **Source Viewer**: Document citations open the indexed passage with a highlighted quote. Uploaded PDFs are retained locally and open at the cited page beside the passage. Older PDFs uploaded before this feature need to be uploaded again for preview.
 - **Evaluation Dashboard**: A 36-question local benchmark reports hit@1, hit@3, source match, abstention, reciprocal rank, and retrieval latency. The dataset and every case result are visible in the app.
 - **Persistent SQLite Storage & Session History**: Auto-saves research briefs to local SQLite with a responsive History Drawer for 1-click reload, search, and deletion across restarts.
-- **Web Retrieval**: Queries DuckDuckGo Instant Answer and Wikipedia, checks the topic against source titles, and selects answer-relevant sentences. These sources are best suited to established topics; they do not provide comprehensive current news or a general web search index. If the evidence is insufficient, the report says so.
+- **Web Retrieval**: With a server-side Gemini key, uses Google Search grounding and keeps only claims carrying URL citations. It attempts to read a bounded passage from each cited public HTTPS page; when a page is inaccessible, it labels the remaining evidence as a Google-grounded claim. Without grounded results, it falls back to DuckDuckGo Instant Answer and Wikipedia. A URL citation does not independently verify that the source is true.
+- **Comparison Research**: Splits two-subject comparisons into separate searches and requires evidence from both sides before producing a comparison.
 - **Real-Time SSE Streaming**: Async generator architecture streaming incremental thoughts, tool latency, and final report JSON to the client.
-- **Optional Gemini Selection**:
-  - *Gemini Mode*: Uses the configured model to select evidence; the server checks each selected quote against its citation.
+- **Optional Gemini Synthesis**:
+  - *Gemini Mode*: Writes short cited claims from retrieved evidence. The server checks each claim's citation ID and copied support text, and rejects malformed or missing support. This attribution check cannot prove that a paraphrase is logically entailed by the source.
   - *No-key Mode*: Selects relevant sentences from available sources, or returns an explicit no-evidence result. Broad comparisons need directly supporting passages; no-key mode does not invent a comparison from unrelated excerpts.
 - **Export Capabilities**: 1-click export to Markdown (`.md`) or printable PDF format.
 
@@ -124,7 +125,7 @@ cp .env.example .env
 ```
 > *Note: An API key is optional. A key in `.env` stays on the server and is used in local or demo mode. Without one, InsightPilot displays source excerpts. Uploaded documents persist in `data/documents.db` across restarts in local mode. Uploads are limited to 10 MB.*
 
-Open **Evaluation** in the top bar to run the bundled benchmark. The benchmark uses [`evaluation/questions.json`](evaluation/questions.json) and the two sample documents. It measures retrieval behavior; it does not establish whether statements in those sample documents are true.
+Open **Evaluation** in the top bar to run the bundled offline benchmarks. Retrieval cases use [`evaluation/questions.json`](evaluation/questions.json); answer checks use [`evaluation/answer_cases.json`](evaluation/answer_cases.json) to measure answer relevance, citation wiring, and abstention. These checks do not establish whether statements in source documents are true or score live Gemini responses.
 
 ### 3. Launch the Server
 
@@ -141,7 +142,7 @@ Interactive API Docs (Swagger): **`http://127.0.0.1:8080/docs`**
 
 The included [`render.yaml`](render.yaml) deploys a single public demo service on Render. Connect this repository as a **Blueprint** in the Render dashboard and approve creation of the `insightpilot-demo` web service. The Blueprint installs dependencies, starts `uvicorn backend.app:app` on Render's port, checks `/api/health`, and waits for CI checks before automatic deploys. Python 3.13 is selected in [`.python-version`](.python-version).
 
-The deployed service sets `APP_MODE=demo`. This mode indexes only the bundled sample documents in memory, including a small PDF for the **Try PDF Source Viewer** quick pick. Visitors can run research, inspect sources, run the retrieval evaluation, print reports, and download Markdown. Uploads, document and report deletion, saved report history, and visitor supplied Gemini keys are disabled. A server-side `GEMINI_API_KEY` is used when configured; the included Render Blueprint does not set one. Model calls can incur usage charges. The service stores no visitor research after a restart. Research and evaluation requests have single-process rate limits. Do not set `APP_MODE=local` on a public service: that mode has shared uploads and reports without accounts.
+The deployed service sets `APP_MODE=demo`. This mode indexes only the bundled sample documents in memory, including a small PDF for the **Try PDF Source Viewer** quick pick. Visitors can run research, inspect sources, run the evaluation, print reports, and download Markdown. Uploads, document and report deletion, saved report history, and visitor supplied Gemini keys are disabled. A server-side `GEMINI_API_KEY` enables Gemini and Google Search grounding when configured; the included Render Blueprint does not set one. Model and grounded search calls can incur usage charges. The service stores no visitor research after a restart. Research and evaluation requests have single-process rate limits. Do not set `APP_MODE=local` on a public service: that mode has shared uploads and reports without accounts.
 
 For local editing, leave `APP_MODE=local` in `.env` (or unset it) and run `python main.py`. Local mode stores documents and reports in two SQLite files under `data/`. Set `DATA_DIR` if you want both files on a different persistent directory. A hosted service that allows private user uploads needs authentication, per-user document access, abuse controls, and durable storage before enabling local mode features for visitors.
 

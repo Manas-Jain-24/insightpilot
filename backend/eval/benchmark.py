@@ -6,11 +6,45 @@ from pathlib import Path
 
 from backend.rag.document_loader import DocumentLoader
 from backend.rag.vector_store import VectorStore
+from backend.agent.gemini_client import GeminiClient
+from backend.models import Citation
 
 
 ROOT = Path(__file__).resolve().parents[2]
 DATASET = ROOT / "evaluation" / "questions.json"
 SAMPLES = ROOT / "sample_data"
+ANSWER_DATASET = ROOT / "evaluation" / "answer_cases.json"
+
+
+def run_answer_benchmark() -> dict:
+    """Offline answer checks; no model calls or network requests."""
+    cases = json.loads(ANSWER_DATASET.read_text(encoding="utf-8"))
+    client = GeminiClient(api_key="")
+    rows = []
+    for case in cases:
+        citations = [Citation(id=index, source_type="web", **source)
+                     for index, source in enumerate(case["sources"], start=1)]
+        report = client.synthesize_final_report(case["query"], [], citations)
+        abstained = report.metrics.get("mode") == "no_evidence"
+        matched = case["expected_phrase"].casefold() in report.executive_summary.casefold() if not case["abstain"] else abstained
+        source_ids = {citation.id for citation in citations}
+        citations_valid = all(
+            all(citation_id in source_ids and f"[{citation_id}]" in finding.content
+                for citation_id in finding.citations)
+            for finding in report.key_findings
+        ) and all(citation.id in source_ids for citation in report.citations)
+        rows.append({"query": case["query"], "expected_abstention": case["abstain"],
+                     "abstained": abstained, "answer_match": matched,
+                     "citations_valid": citations_valid,
+                     "summary": report.executive_summary})
+    positives = [row for row in rows if not row["expected_abstention"]]
+    negatives = [row for row in rows if row["expected_abstention"]]
+    rate = lambda n, d: round(n / d, 3) if d else 0.0
+    return {"questions": len(rows), "metrics": {
+        "answer_match_rate": rate(sum(row["answer_match"] for row in positives), len(positives)),
+        "citation_validity_rate": rate(sum(row["citations_valid"] for row in rows), len(rows)),
+        "answer_abstention_rate": rate(sum(row["abstained"] for row in negatives), len(negatives)),
+    }, "cases": rows}
 
 
 def run_benchmark() -> dict:
@@ -65,7 +99,8 @@ def run_benchmark() -> dict:
                 "abstention_rate": rate(sum(row["success"] for row in negatives), len(negatives)),
                 "mean_latency_ms": round(sum(row["latency_ms"] for row in results) / len(results), 2) if results else 0.0
             },
-            "cases": results
+            "cases": results,
+            "answer_quality": run_answer_benchmark(),
         }
     finally:
         store.close()

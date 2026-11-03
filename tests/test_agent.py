@@ -20,7 +20,7 @@ class TestInsightPilot(unittest.TestCase):
     def setUp(self):
         self.loader = DocumentLoader(chunk_size=300, chunk_overlap=50)
         self.vector_store = VectorStore(db_path=":memory:")
-        self.gemini_client = GeminiClient()
+        self.gemini_client = GeminiClient(api_key="")
         self.orchestrator = ResearchOrchestrator(self.vector_store, self.gemini_client)
 
     def tearDown(self):
@@ -254,7 +254,7 @@ class TestInsightPilot(unittest.TestCase):
             with patch("backend.agent.orchestrator.GeminiClient", return_value=request_client) as factory:
                 events = [item async for item in self.orchestrator.execute_stream(request)]
             factory.assert_called_once_with(api_key="request-key")
-            self.assertEqual(self.gemini_client.api_key, os.environ.get("GEMINI_API_KEY", "").strip())
+            self.assertEqual(self.gemini_client.api_key, "")
             self.assertTrue(any(item["event"] == "report" for item in events))
         asyncio.run(run_test())
 

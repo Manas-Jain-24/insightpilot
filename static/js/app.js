@@ -454,7 +454,7 @@ function renderReport(report) {
   reportTimestamp.textContent = new Date((report.created_at || Date.now() / 1000) * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   reportDuration.textContent = report.metrics?.total_duration_seconds != null ? `${report.metrics.total_duration_seconds}s` : "—";
   reportCitationsCount.textContent = `${report.citations?.length || 0} Citations`;
-  const reportModeLabels = { extractive_fallback: "Source excerpts", no_evidence: "No evidence", verified_quotes: "Verified quotes" };
+  const reportModeLabels = { extractive_fallback: "Source excerpts", no_evidence: "No evidence", verified_quotes: "Verified quotes", grounded_synthesis: "Cited answer" };
   reportModelBadge.textContent = report.metrics?.model || reportModeLabels[report.metrics?.mode] || "Evidence report";
 
   // Executive summary
@@ -497,7 +497,7 @@ function renderReport(report) {
   citationsReferenceList.innerHTML = report.citations.map(c => `
     <div class="citation-card" id="cite_ref_${c.id}">
       <h4>[${c.id}] ${escapeHtml(c.title)}</h4>
-      <p>"${escapeHtml(c.snippet)}"</p>
+      <p>${c.evidence_type === "grounded_claim" ? "Search-grounded claim" : "Source excerpt"}: "${escapeHtml(c.snippet)}"</p>
       <div style="font-size: 0.72rem; color: var(--accent-cyan); margin-top: 0.35rem;">
         Type: ${c.source_type.toUpperCase()}${c.source_type === "document" ? ` • Query term match: ${(c.relevance_score * 100).toFixed(0)}%` : ""}
         ${c.url_or_page ? ` • Reference: ${escapeHtml(c.url_or_page)}` : ""}
@@ -549,6 +549,15 @@ function showCitationModal(citeId) {
 
   const modalTitle = document.getElementById("citationModalTitle");
   const modalBody = document.getElementById("citationModalBody");
+  let webLink = "";
+  if (cite.source_type === "web" && cite.url_or_page) {
+    try {
+      const parsed = new URL(cite.url_or_page);
+      if (["https:", "http:"].includes(parsed.protocol)) {
+        webLink = `<a href="${escapeHtml(parsed.href)}" target="_blank" rel="noopener noreferrer">Open cited page ↗</a>`;
+      }
+    } catch (_) { /* Keep the citation text when the URL is malformed. */ }
+  }
 
   modalTitle.textContent = `Citation [${cite.id}]: ${cite.title}`;
   modalBody.innerHTML = `
@@ -557,11 +566,12 @@ function showCitationModal(citeId) {
       ${cite.source_type === "document" ? `<span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;">Query term match: ${(cite.relevance_score * 100).toFixed(0)}%</span>` : ""}
     </div>
     <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: var(--radius-sm); border-left: 3px solid var(--accent-cyan); font-style: italic; color: #e2e8f0; font-size: 0.92rem; line-height: 1.6; margin-bottom: 1rem;">
-      "${escapeHtml(cite.snippet)}"
+      ${cite.evidence_type === "grounded_claim" ? "Search-grounded claim" : "Source excerpt"}: "${escapeHtml(cite.snippet)}"
     </div>
     <div style="font-size: 0.82rem; color: var(--text-muted);">
       <strong>Source Location:</strong> ${escapeHtml(cite.url_or_page || "Document Context")}
     </div>
+    ${webLink ? `<div style="margin-top: 0.8rem;">${webLink}</div>` : ""}
     ${cite.doc_id && cite.chunk_id ? `<button class="btn btn-primary" id="btnViewSource" style="margin-top: 1rem;">Open source</button>` : ""}
   `;
 
@@ -618,6 +628,7 @@ async function openEvaluation() {
     if (!response.ok) throw new Error("Benchmark could not run.");
     const data = await response.json();
     const metrics = data.metrics;
+    const answer = data.answer_quality;
     const cards = [
       ["Hit @ 1", `${(metrics.hit_at_1 * 100).toFixed(0)}%`],
       ["Hit @ 3", `${(metrics.hit_at_3 * 100).toFixed(0)}%`],
@@ -639,6 +650,20 @@ async function openEvaluation() {
           <td>${escapeHtml(row.top_source || "None")}</td>
           <td>${row.rank || "—"}</td>
           <td class="${row.success ? "pass" : "fail"}">${row.success ? "Pass" : "Miss"}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+      <p class="evaluation-description">Answer quality · ${answer.questions} offline cases</p>
+      <div class="evaluation-metrics">
+        <div class="evaluation-metric"><strong>${(answer.metrics.answer_match_rate * 100).toFixed(0)}%</strong><span>Answer match</span></div>
+        <div class="evaluation-metric"><strong>${(answer.metrics.citation_validity_rate * 100).toFixed(0)}%</strong><span>Citation validity</span></div>
+        <div class="evaluation-metric"><strong>${(answer.metrics.answer_abstention_rate * 100).toFixed(0)}%</strong><span>Answer abstention</span></div>
+      </div>
+      <div style="overflow-x: auto;"><table class="evaluation-table">
+        <thead><tr><th>Question</th><th>Answer</th><th>Citations</th></tr></thead>
+        <tbody>${answer.cases.map(row => `<tr>
+          <td>${escapeHtml(row.query)}</td>
+          <td class="${row.answer_match ? "pass" : "fail"}">${row.answer_match ? "Pass" : "Miss"}</td>
+          <td class="${row.citations_valid ? "pass" : "fail"}">${row.citations_valid ? "Valid" : "Invalid"}</td>
         </tr>`).join("")}</tbody>
       </table></div>
     `;

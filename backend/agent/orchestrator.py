@@ -9,6 +9,8 @@ from backend.agent.tools import (
     DocumentRetrievalTool, WebSearchTool, DataSynthesisTool, KnowledgeGraphBuilderTool
 )
 from backend.agent.gemini_client import GeminiClient
+from backend.agent.query_planner import research_queries
+from backend.agent.page_reader import fetch_page_excerpt
 
 
 from backend.db.database import Database
@@ -25,6 +27,41 @@ class ResearchOrchestrator:
         self.web_tool = WebSearchTool()
         self.synth_tool = DataSynthesisTool()
         self.kg_tool = KnowledgeGraphBuilderTool()
+
+    async def _search_web(self, client: GeminiClient, query: str) -> Dict[str, Any]:
+        """Search each comparison subject, preferring annotated Google Search claims."""
+        queries = research_queries(query)
+        gathered = []
+        groups = []
+        providers = []
+        for subquery in queries:
+            result = {"results": []}
+            if client.has_api_key():
+                try:
+                    result = await asyncio.to_thread(client.search_web_grounded, subquery)
+                except Exception as exc:
+                    print(f"[ResearchOrchestrator] Grounded search unavailable: {type(exc).__name__}")
+            if not result.get("results"):
+                result = await self.web_tool.execute_async(subquery, num_results=3)
+            elif result.get("source") == "google_search_grounding":
+                items = result["results"][:3]
+                excerpts = await asyncio.gather(*(
+                    fetch_page_excerpt(item["url"], subquery) for item in items
+                ))
+                for item, excerpt in zip(items, excerpts):
+                    if excerpt:
+                        item["snippet"] = excerpt
+                        item["evidence_type"] = "source_excerpt"
+            providers.append(result.get("source", "unavailable"))
+            group = []
+            for item in result.get("results", [])[:3]:
+                marker = (item.get("url"), item.get("snippet"))
+                if marker not in {(entry.get("url"), entry.get("snippet")) for entry in gathered}:
+                    gathered.append(item)
+                    group.append(len(gathered) - 1)
+            groups.append(group)
+        return {"source": ",".join(providers), "query": query, "results": gathered[:6],
+                "comparison_groups": groups if len(groups) > 1 else None}
 
     async def execute_stream(self, request: ResearchRequest) -> AsyncGenerator[Dict[str, Any], None]:
         start_time = time.time()
@@ -55,9 +92,11 @@ class ResearchOrchestrator:
         citations: List[Citation] = []
         observations: List[Dict[str, Any]] = []
         citation_id_counter = 1
+        searched_documents = False
+        searched_web = False
 
         # Check if we can run true autonomous Gemini function calling
-        if client.has_api_key() and (request.use_documents or request.search_web):
+        if client.has_api_key() and len(research_queries(query)) == 1 and (request.use_documents or request.search_web):
             try:
                 step1 = plan[0]
                 yield {"event": "step_start", "data": {"step_id": step1.id}}
@@ -117,6 +156,7 @@ class ResearchOrchestrator:
                             tool_result_str = ""
 
                             if tool_name == "search_documents" and request.use_documents:
+                                searched_documents = True
                                 q = args.get("query", query)
                                 top_k = args.get("top_k", 3)
                                 doc_res = self.doc_tool.execute(query=q, top_k=top_k, filter_doc_ids=doc_ids if doc_ids else None)
@@ -147,9 +187,9 @@ class ResearchOrchestrator:
                                 tool_result_str = str(doc_res)
 
                             elif tool_name == "search_web" and request.search_web:
+                                searched_web = True
                                 q = args.get("query", query)
-                                num = args.get("num_results", 3)
-                                web_res = await self.web_tool.execute_async(query=q, num_results=num)
+                                web_res = await self._search_web(client, q)
                                 latency = round((time.time() - t0) * 1000, 1)
 
                                 for w in web_res.get("results", []):
@@ -158,6 +198,7 @@ class ResearchOrchestrator:
                                         source_type="web",
                                         title=w["title"],
                                         snippet=w["snippet"][:500] + ("..." if len(w["snippet"]) > 500 else ""),
+                                        evidence_type=w.get("evidence_type", "source_excerpt"),
                                         relevance_score=0.0,
                                         url_or_page=w["url"]
                                     )
@@ -201,9 +242,10 @@ class ResearchOrchestrator:
                 print(f"[ResearchOrchestrator] Dynamic interaction error: {e}. Falling back to guided execution.")
                 # We will fall through to ensure citations and final report are synthesized reliably
 
-        # If citations were empty (fallback), ensure we perform baseline retrieval
-        if not citations and (request.use_documents or request.search_web):
-            if request.use_documents:
+        # Complete any tool retrieval that the model did not perform.
+        if ((request.use_documents and not searched_documents) or
+                (request.search_web and not searched_web)):
+            if request.use_documents and not searched_documents:
                 step1 = plan[0]
                 yield {"event": "step_start", "data": {"step_id": step1.id}}
                 yield {
@@ -242,7 +284,7 @@ class ResearchOrchestrator:
                 yield {"event": "step_complete", "data": {"step_id": step1.id}}
                 await asyncio.sleep(0.3)
 
-            if request.search_web:
+            if request.search_web and not searched_web:
                 # Web search baseline
                 step2 = plan[1] if len(plan) > 1 else plan[0]
                 yield {"event": "step_start", "data": {"step_id": step2.id}}
@@ -251,7 +293,7 @@ class ResearchOrchestrator:
                     "data": {"step_id": step2.id, "thought": "Searching the web for sources relevant to the question."}
                 }
                 t0 = time.time()
-                web_result = await self.web_tool.execute_async(query=query, num_results=3)
+                web_result = await self._search_web(client, query)
                 latency2 = round((time.time() - t0) * 1000, 1)
 
                 yield {
@@ -268,6 +310,7 @@ class ResearchOrchestrator:
                         source_type="web",
                         title=w["title"],
                         snippet=w["snippet"][:500] + ("..." if len(w["snippet"]) > 500 else ""),
+                        evidence_type=w.get("evidence_type", "source_excerpt"),
                         relevance_score=0.0,
                         url_or_page=w["url"]
                     )
@@ -276,6 +319,12 @@ class ResearchOrchestrator:
                     citation_id_counter += 1
 
                 observations.append({"tool": "web_search", "data": web_result})
+                if web_result.get("comparison_groups"):
+                    base_id = citation_id_counter - len(web_result["results"])
+                    observations.append({"comparison_groups": [
+                        [base_id + offset for offset in group]
+                        for group in web_result["comparison_groups"]
+                    ]})
                 yield {"event": "step_complete", "data": {"step_id": step2.id}}
                 await asyncio.sleep(0.3)
 
@@ -298,7 +347,11 @@ class ResearchOrchestrator:
 
         total_elapsed = round(time.time() - start_time, 2)
         report.metrics["total_duration_seconds"] = total_elapsed
-        report.metrics["citations_count"] = len(citations)
+        report.metrics["citations_count"] = len(report.citations)
+        report.metrics["web_provider"] = ",".join(
+            item["data"].get("source", "unavailable") for item in observations
+            if item.get("tool") in {"web_search", "search_web"}
+        )
 
         # Auto-save report to SQLite database
         if self.db:
@@ -313,7 +366,7 @@ class ResearchOrchestrator:
             "data": {
                 "report_id": report.id,
                 "elapsed_seconds": total_elapsed,
-                "total_citations": len(citations),
+                "total_citations": len(report.citations),
                 "status": "success"
             }
         }

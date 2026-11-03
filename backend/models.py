@@ -27,6 +27,7 @@ class Citation(BaseModel):
     source_type: Literal["document", "web"]
     title: str
     snippet: str
+    evidence_type: Literal["source_excerpt", "grounded_claim"] = "source_excerpt"
     relevance_score: float = 0.0
     url_or_page: Optional[str] = None
     doc_id: Optional[str] = None
