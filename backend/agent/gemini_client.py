@@ -156,6 +156,73 @@ class GeminiClient:
 
         return self._client.interactions.create(**kwargs)
 
+    def stream_interaction(self, input_data: Any, tools: List[Dict[str, Any]],
+                           previous_interaction_id: Optional[str] = None):
+        """Stream one stateful research interaction, including tool steps."""
+        if not self.has_api_key():
+            return iter(())
+        kwargs = {"model": self.model, "input": input_data, "stream": True}
+        if previous_interaction_id:
+            kwargs["previous_interaction_id"] = previous_interaction_id
+        if tools:
+            kwargs["tools"] = tools
+        return self._client.interactions.create(**kwargs)
+
+    def report_from_annotated_interaction(self, query: str, interaction: Any,
+                                          depth: str = "balanced") -> Optional[ResearchReport]:
+        """Accept only output segments carrying URL citation annotations."""
+        citations = []
+        findings = []
+        by_url = {}
+        for step in getattr(interaction, "steps", None) or []:
+            if getattr(step, "type", None) != "model_output":
+                continue
+            for block in getattr(step, "content", None) or []:
+                if getattr(block, "type", None) != "text":
+                    continue
+                body = getattr(block, "text", "") or ""
+                for annotation in getattr(block, "annotations", None) or []:
+                    if getattr(annotation, "type", None) != "url_citation":
+                        continue
+                    url = getattr(annotation, "url", "") or ""
+                    parsed = urlparse(url)
+                    start = getattr(annotation, "start_index", None)
+                    end = getattr(annotation, "end_index", None)
+                    if parsed.scheme != "https" or not parsed.netloc or not isinstance(start, int) or not isinstance(end, int):
+                        continue
+                    if not (0 <= start < end <= len(body)):
+                        continue
+                    claim = re.sub(r"\s+", " ", body[start:end]).strip()
+                    if len(claim) < 24:
+                        continue
+                    if url not in by_url:
+                        citation_id = len(citations) + 1
+                        by_url[url] = citation_id
+                        citations.append(Citation(
+                            id=citation_id, source_type="web", evidence_type="grounded_claim",
+                            title=getattr(annotation, "title", None) or parsed.netloc,
+                            snippet=claim, url_or_page=url,
+                        ))
+                    citation_id = by_url[url]
+                    if any(f.content == f"{claim} [{citation_id}]" for f in findings):
+                        continue
+                    findings.append(Finding(
+                        heading=citations[citation_id - 1].title,
+                        content=f"{claim} [{citation_id}]",
+                        key_takeaway="Search-grounded claim: " + claim,
+                        citations=[citation_id],
+                    ))
+                    if len(findings) >= 4:
+                        break
+        if not findings:
+            return None
+        return ResearchReport(
+            query=query, depth=depth,
+            executive_summary=" ".join(f.content for f in findings),
+            key_findings=findings, citations=citations,
+            metrics={"model": self.model, "mode": "search_grounded_stream"},
+        )
+
     def embed_text(self, text: str) -> Optional[List[float]]:
         if not self.has_api_key():
             return None
@@ -204,7 +271,11 @@ Example:
             except Exception as e:
                 print(f"[GeminiClient] Fallback to deterministic planner due to: {e}")
 
-        # Deterministic plan
+        return self.deterministic_plan(query)
+
+    @staticmethod
+    def deterministic_plan(query: str) -> List[PlanStep]:
+        """Display a local plan without adding a model call to research."""
         return [
             PlanStep(
                 id=1,
@@ -304,7 +375,7 @@ Return only JSON: {{"claims": [{{"claim": "short answer sentence", "citation_id"
 
     @staticmethod
     def _verify_grounded_claims(selected: Any, citations: List[Citation]) -> Tuple[List[Finding], int]:
-        """Require each generated claim to carry a real citation and copied support text."""
+        """Reject claims whose copied support lacks their key facts or polarity."""
         if not isinstance(selected, list):
             return [], 1
         by_id = {c.id: c for c in citations[:20]}
@@ -327,6 +398,19 @@ Return only JSON: {{"claims": [{{"claim": "short answer sentence", "citation_id"
             source = re.sub(r"\s+", " ", citation.snippet.removesuffix("...")).strip()
             if (len(claim) < 15 or len(claim) > 450 or len(support) < 24 or
                     support not in source or (citation_id, claim) in seen):
+                rejected += 1
+                continue
+            # Quoted support alone is insufficient when the claim adds a number,
+            # reversal, or unsupported comparison. This is a conservative check,
+            # not a full natural-language entailment proof.
+            claim_numbers = set(re.findall(r"\b\d+(?:\.\d+)?%?\b", claim))
+            support_numbers = set(re.findall(r"\b\d+(?:\.\d+)?%?\b", support))
+            critical = {"not", "never", "no", "only", "always", "all", "none",
+                        "more", "less", "most", "least", "faster", "slower",
+                        "higher", "lower", "increase", "decrease"}
+            claim_words = set(re.findall(r"[a-z]+", claim.casefold()))
+            support_words = set(re.findall(r"[a-z]+", support.casefold()))
+            if not claim_numbers.issubset(support_numbers) or not (claim_words & critical).issubset(support_words):
                 rejected += 1
                 continue
             seen.add((citation_id, claim))
