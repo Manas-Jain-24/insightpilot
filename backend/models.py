@@ -33,6 +33,8 @@ class Citation(BaseModel):
     doc_id: Optional[str] = None
     chunk_id: Optional[str] = None
     page_number: Optional[int] = None
+    retrieved_at: Optional[float] = None
+    published_at: Optional[str] = None
 
 
 class KnowledgeNode(BaseModel):
@@ -53,11 +55,18 @@ class KnowledgeGraph(BaseModel):
     edges: List[KnowledgeEdge] = Field(default_factory=list)
 
 
+class ClaimEvidence(BaseModel):
+    citation_id: int
+    quote: str
+    verification: Literal["exact_quote", "search_grounding"]
+
+
 class Finding(BaseModel):
     heading: str
     content: str
     key_takeaway: Optional[str] = None
     citations: List[int] = Field(default_factory=list)
+    evidence: List[ClaimEvidence] = Field(default_factory=list)
 
 
 class ResearchReport(BaseModel):
@@ -81,6 +90,7 @@ class ResearchRequest(BaseModel):
     api_key: Optional[str] = None
     search_web: bool = True
     use_documents: bool = True
+    parent_report_id: Optional[str] = Field(default=None, max_length=60, pattern=r"^rep_[a-zA-Z0-9_-]+$")
 
 
 class DocumentChunk(BaseModel):

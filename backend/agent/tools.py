@@ -17,13 +17,9 @@ class DocumentRetrievalTool:
         self.description = "Searches indexed user documents using SQLite full-text search."
 
     def execute(self, query: str, top_k: int = 3, filter_doc_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+        top_k = max(1, min(int(top_k), 10))
         query_terms = terms(query)
-        results = self.vector_store.similarity_search(
-            query=" ".join(query_terms), top_k=max(top_k * 4, 12), filter_doc_ids=filter_doc_ids
-        ) if query_terms else []
-        results = [(chunk, coverage(query_terms, chunk.content)) for chunk, _ in results]
-        results = sorted(((chunk, score) for chunk, score in results if score),
-                         key=lambda item: item[1], reverse=True)[:top_k]
+        results, retrieval_mode = self.vector_store.ranked_search(query, top_k, filter_doc_ids)
         if re.search(r"\b(stages?|steps?|phases?|items?|list)\b", query, re.I):
             seen = {chunk.id for chunk, _ in results}
             context = []
@@ -36,6 +32,7 @@ class DocumentRetrievalTool:
         if not results:
             return {
                 "found": 0,
+                "retrieval_mode": retrieval_mode,
                 "message": "No matching document excerpts found for this query.",
                 "chunks": []
             }
@@ -53,6 +50,7 @@ class DocumentRetrievalTool:
 
         return {
             "found": len(extracted),
+            "retrieval_mode": retrieval_mode,
             "query": query,
             "chunks": extracted
         }

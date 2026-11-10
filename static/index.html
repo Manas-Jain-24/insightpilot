@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/css/styles.css?v=research-upgrades-1">
 </head>
 <body>
 
@@ -204,6 +204,7 @@
           </div>
 
           <!-- Executive Summary Section -->
+          <p id="researchNotice" class="research-notice" role="status" hidden></p>
           <div class="section-card">
             <h3><span>📌</span> Report Overview</h3>
             <p class="exec-summary-text" id="execSummaryContent"></p>
@@ -244,6 +245,19 @@
           <div class="section-card">
             <h3><span>📚</span> Grounded Citations & Sources</h3>
             <div id="citationsReferenceList"></div>
+          </div>
+
+          <div class="section-card followup-section">
+            <h3>Continue this research</h3>
+            <p>Ask about these findings using the report's existing sources. For new sources, start a research run above.</p>
+            <form id="followupForm">
+              <label for="followupInput">Follow-up question</label>
+              <textarea id="followupInput" maxlength="1000" rows="2" placeholder="Explain finding two, or compare these findings…" required></textarea>
+              <div class="followup-actions">
+                <button class="btn btn-primary" id="btnFollowUp" type="submit">Ask follow-up</button>
+                <button class="btn btn-secondary" id="btnPreviousReport" type="button" hidden>Back to previous report</button>
+              </div>
+            </form>
           </div>
 
         </div>
@@ -370,6 +384,6 @@
     </div>
   </div>
 
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=research-upgrades-1"></script>
 </body>
 </html>

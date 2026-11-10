@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from backend.rag.vector_store import VectorStore
+from backend.rag.embeddings import LocalEmbeddings
 from backend.rag.document_loader import DocumentLoader
 from backend.agent.gemini_client import GeminiClient
 from backend.db.database import Database
@@ -30,7 +31,8 @@ if app_mode not in {"local", "demo"}:
     raise RuntimeError("APP_MODE must be 'local' or 'demo'")
 
 # Demo mode keeps its read-only, in-memory stores. A server-side Gemini key is optional.
-vector_store = VectorStore(db_path=":memory:" if app_mode == "demo" else None)
+embedding_model = LocalEmbeddings() if os.environ.get("SEMANTIC_SEARCH", "true").lower() == "true" else None
+vector_store = VectorStore(db_path=":memory:" if app_mode == "demo" else None, embedder=embedding_model)
 gemini_client = GeminiClient()
 db = None if app_mode == "demo" else Database()
 
@@ -120,7 +122,7 @@ if os.path.exists(static_dir):
 
     @app.get("/")
     async def serve_index():
-        return FileResponse(os.path.join(static_dir, "index.html"))
+        return FileResponse(os.path.join(static_dir, "index.html"), headers={"Cache-Control": "no-cache"})
 
 
 if __name__ == "__main__":

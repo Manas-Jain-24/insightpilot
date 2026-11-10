@@ -3,6 +3,7 @@ import json
 import shutil
 import tempfile
 import uuid
+import asyncio
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse, PlainTextResponse, Response
 from typing import List, Dict, Any, Optional
@@ -15,6 +16,7 @@ from backend.agent.gemini_client import GeminiClient
 from backend.agent.orchestrator import ResearchOrchestrator
 from backend.db.database import Database
 from backend.eval.benchmark import run_benchmark
+from backend.eval.semantic import evaluate as evaluate_semantic
 from backend.rag.pdf_preview import render_pdf_page
 from backend.api.rate_limit import DemoRateLimiter
 
@@ -63,12 +65,16 @@ def create_router(
     def public_config():
         return {"mode": mode, "uploads_enabled": mode != "demo",
                 "history_enabled": bool(db), "visitor_api_keys_enabled": mode != "demo",
-                "model_enabled": gemini_client.has_api_key()}
+                "model_enabled": gemini_client.has_api_key(),
+                "google_grounding_available": gemini_client.grounding_available(),
+                "semantic_search_ready": bool(vector_store.embedder and vector_store.embedder.prepare())}
 
     @router.get("/evaluation")
     def evaluation(request: Request):
         demo_limit(request, "evaluation", 12, 60)
-        return run_benchmark()
+        result = run_benchmark()
+        result["semantic"] = evaluate_semantic(vector_store.embedder) if vector_store.embedder and vector_store.embedder.prepare() else None
+        return result
 
     # ---------------- Document Ingestion ----------------
     @router.post("/documents/upload", response_model=DocumentMetadata)
@@ -170,6 +176,8 @@ def create_router(
         if mode == "demo" and request.api_key:
             raise HTTPException(status_code=403, detail="Visitor API keys are disabled in the public demo")
         demo_limit(http_request, "research", 6, 30)
+        if request.parent_report_id and not await asyncio.to_thread(orchestrator.get_report, request.parent_report_id):
+            raise HTTPException(status_code=404, detail="Previous report expired or was deleted. Rerun it to continue.")
 
         async def event_generator():
             try:
@@ -263,6 +271,9 @@ def create_router(
             md_lines.append(finding.content)
             if finding.key_takeaway:
                 md_lines.append(f"> **Takeaway**: {finding.key_takeaway}")
+            for evidence in finding.evidence:
+                label = "Copied support" if evidence.verification == "exact_quote" else "Search-grounded support"
+                md_lines.append(f"> **{label} [{evidence.citation_id}]**: {evidence.quote}")
             md_lines.append("")
 
         if report.comparative_matrix:
@@ -289,6 +300,7 @@ def create_router(
                 url_str = f" - {cite.url_or_page}" if cite.url_or_page else ""
                 md_lines.append(f"- **[{cite.id}]** {source_tag} *{cite.title}*{url_str}")
                 md_lines.append(f"  > \"{cite.snippet}\"")
+                md_lines.append(f"  Published: {cite.published_at or 'Unknown'}; retrieved (Unix time): {cite.retrieved_at or 'Not recorded'}")
 
         content = "\n".join(md_lines)
         return PlainTextResponse(

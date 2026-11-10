@@ -4,6 +4,7 @@ import asyncio
 import ipaddress
 import re
 import socket
+from datetime import datetime
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -19,8 +20,17 @@ class _Paragraphs(HTMLParser):
         self.depth = 0
         self.buffer = []
         self.paragraphs = []
+        self.published_at = None
 
     def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if tag == "meta" and (values.get("property") or values.get("name")) in {
+            "article:published_time", "datePublished", "date", "pubdate"
+        }:
+            try:
+                self.published_at = datetime.fromisoformat(values.get("content", "").replace("Z", "+00:00")).date().isoformat()
+            except ValueError:
+                pass
         if tag in {"script", "style", "nav", "footer", "header", "noscript"}:
             self.skip += 1
         if tag in {"p", "h1", "h2", "h3", "article"}:
@@ -62,7 +72,7 @@ def _public_https_url(url: str) -> bool:
         return False
 
 
-async def fetch_page_excerpt(url: str, query: str) -> str:
+async def fetch_page_excerpt(url: str, query: str, metadata=None) -> str:
     """Return one on-topic passage, or empty text when a page cannot be read safely."""
     if not await asyncio.to_thread(_public_https_url, url):
         return ""
@@ -86,6 +96,8 @@ async def fetch_page_excerpt(url: str, query: str) -> str:
         parser.feed(html)
     except (ValueError, AssertionError):
         return ""
+    if metadata is not None:
+        metadata["published_at"] = parser.published_at
     wanted = set(topic_terms(query))
     ranked = []
     for paragraph in parser.paragraphs:

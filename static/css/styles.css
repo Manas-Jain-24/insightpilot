@@ -962,3 +962,14 @@ body {
   gap: 0.5rem;
   flex-shrink: 0;
 }
+/* Evidence inspection and report follow-ups */
+.research-notice { padding: 0.85rem 1rem; border-left: 3px solid var(--accent-cyan); background: rgba(34,211,238,.08); line-height: 1.6; }
+.evidence-card { margin-top: 1rem; padding: 1rem; border: 1px solid rgba(148,163,184,.25); border-radius: 8px; }
+.evidence-card blockquote { margin: 1rem 0; padding-left: 1rem; border-left: 3px solid var(--accent-cyan); white-space: pre-wrap; line-height: 1.65; }
+.evidence-date, .followup-section > p { font-size: .82rem; color: var(--text-muted); line-height: 1.6; }
+.evidence-claim { font-weight: 600; line-height: 1.6; }
+.followup-section label { display: block; margin: 1rem 0 .5rem; }
+#followupInput { box-sizing: border-box; width: 100%; padding: .8rem; border-radius: 8px; border: 1px solid rgba(148,163,184,.35); background: rgba(15,23,42,.6); color: #e2e8f0; font: inherit; resize: vertical; }
+.followup-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .75rem; }
+.inspect-evidence { margin: .5rem 0; }
+[hidden] { display: none !important; }

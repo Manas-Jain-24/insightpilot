@@ -247,8 +247,25 @@ window.deleteDoc = async function(docId) {
 };
 
 // ---------------- Agent Research Execution (SSE Stream) ----------------
-async function launchAgentResearch() {
-  const query = queryInput.value.trim();
+const reportTrail = [];
+
+document.getElementById("followupForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const query = document.getElementById("followupInput").value.trim();
+  if (currentReport && query) launchAgentResearch({ followupQuery: query, parentReport: currentReport });
+});
+document.getElementById("btnPreviousReport").addEventListener("click", () => {
+  if (isRunning) return;
+  if (!reportTrail.length) {
+    if (appConfig.history_enabled && currentReport?.metrics?.parent_report_id) window.loadReportById(currentReport.metrics.parent_report_id);
+    return;
+  }
+  currentReport = reportTrail.pop();
+  renderReport(currentReport);
+});
+
+async function launchAgentResearch(options = {}) {
+  const query = (options.followupQuery || queryInput.value).trim();
   if (!query) {
     alert("Please enter a research topic or query first.");
     queryInput.focus();
@@ -258,6 +275,8 @@ async function launchAgentResearch() {
   if (isRunning) return;
   isRunning = true;
   btnRunAgent.disabled = true;
+  document.getElementById("btnFollowUp").disabled = true;
+  document.getElementById("btnPreviousReport").disabled = true;
   btnRunAgent.innerHTML = `<span>⏳ Researching...</span>`;
   agentStatusText.textContent = "Agent Executing ReAct Loop...";
   agentStatusBadge.style.color = "var(--accent-cyan)";
@@ -283,12 +302,14 @@ async function launchAgentResearch() {
         depth: depth,
         api_key: appConfig.visitor_api_keys_enabled ? apiKey : null,
         use_documents: useDocs,
-        search_web: useWeb
+        search_web: useWeb,
+        parent_report_id: options.parentReport?.id || null
       })
     });
 
     if (!response.ok) {
-      throw new Error(`Server returned status ${response.status}`);
+      const error = await response.json().catch(() => ({}));
+      throw new Error(typeof error.detail === "string" ? error.detail : `Server returned status ${response.status}`);
     }
 
     const reader = response.body.getReader();
@@ -308,6 +329,10 @@ async function launchAgentResearch() {
           const jsonStr = line.slice(6);
           try {
             const eventPayload = JSON.parse(jsonStr);
+            if (eventPayload.event === "report") {
+              if (options.parentReport) reportTrail.push(options.parentReport);
+              else reportTrail.length = 0;
+            }
             handleStreamEvent(eventPayload);
           } catch (e) {
             console.error("Error parsing SSE JSON:", e, jsonStr);
@@ -321,6 +346,8 @@ async function launchAgentResearch() {
     stopTimer();
     isRunning = false;
     btnRunAgent.disabled = false;
+    document.getElementById("btnFollowUp").disabled = false;
+    document.getElementById("btnPreviousReport").disabled = false;
     btnRunAgent.innerHTML = `<span>⚡ Launch Agentic Research</span>`;
     agentStatusText.textContent = "ReAct Agent Ready";
     agentStatusBadge.style.color = "var(--accent-emerald)";
@@ -333,6 +360,9 @@ function handleStreamEvent(eventObj) {
   const data = eventObj.data;
 
   switch (event) {
+    case "status":
+      addTraceLog("observation", "Research status", data.message);
+      break;
     case "plan":
       renderPlanSteps(data);
       break;
@@ -449,6 +479,16 @@ function stopTimer() {
 function renderReport(report) {
   reportEmptyState.style.display = "none";
   reportContent.style.display = "block";
+  document.getElementById("followupInput").value = "";
+  document.getElementById("btnPreviousReport").hidden = reportTrail.length === 0 && !(appConfig.history_enabled && report.metrics?.parent_report_id);
+  const notices = [];
+  if (report.metrics?.web_fallback_used || report.metrics?.model_rate_limited) notices.push("Google grounding is unavailable. This report uses available source excerpts.");
+  if (report.metrics?.web_cache_hit) notices.push("Using cached web sources; their retrieval dates appear with the evidence.");
+  if (report.metrics?.retrieval_mode) notices.push(report.metrics.retrieval_mode === "hybrid" ? "Document search used meaning and keywords." : "Document search used keywords.");
+  if (report.metrics?.parent_report_id) notices.push("Follow-up based on the previous report's sources.");
+  const notice = document.getElementById("researchNotice");
+  notice.textContent = notices.join(" ");
+  notice.hidden = notices.length === 0;
 
   reportHeaderTitle.textContent = report.query;
   reportTimestamp.textContent = new Date((report.created_at || Date.now() / 1000) * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -461,13 +501,17 @@ function renderReport(report) {
   execSummaryContent.innerHTML = formatMarkdownWithCitations(report.executive_summary);
 
   // Key Findings
-  findingsContainer.innerHTML = report.key_findings.map(f => `
+  findingsContainer.innerHTML = report.key_findings.map((f, index) => `
     <div class="finding-item">
       <h4>${escapeHtml(f.heading)}</h4>
       <p>${formatMarkdownWithCitations(f.content)}</p>
+      <button class="btn btn-secondary inspect-evidence" data-finding-index="${index}">Inspect evidence for finding ${index + 1}</button>
       ${f.key_takeaway ? `<div class="key-takeaway">💡 Takeaway: ${escapeHtml(f.key_takeaway)}</div>` : ""}
     </div>
   `).join("");
+  findingsContainer.querySelectorAll(".inspect-evidence").forEach(button => {
+    button.addEventListener("click", () => showFindingEvidence(Number(button.dataset.findingIndex)));
+  });
 
   // Comparative Matrix
   if (report.comparative_matrix && Object.keys(report.comparative_matrix).length > 0) {
@@ -499,7 +543,7 @@ function renderReport(report) {
       <h4>[${c.id}] ${escapeHtml(c.title)}</h4>
       <p>${c.evidence_type === "grounded_claim" ? "Search-grounded claim" : "Source excerpt"}: "${escapeHtml(c.snippet)}"</p>
       <div style="font-size: 0.72rem; color: var(--accent-cyan); margin-top: 0.35rem;">
-        Type: ${c.source_type.toUpperCase()}${c.source_type === "document" ? ` • Query term match: ${(c.relevance_score * 100).toFixed(0)}%` : ""}
+        Type: ${c.source_type.toUpperCase()}${c.source_type === "document" ? ` • Retrieval score: ${Number(c.relevance_score || 0).toFixed(2)}` : ""}
         ${c.url_or_page ? ` • Reference: ${escapeHtml(c.url_or_page)}` : ""}
       </div>
       ${c.doc_id && c.chunk_id ? `<button class="btn btn-secondary source-open-btn" data-cite-id="${c.id}" style="margin-top: 0.65rem;">Open source</button>` : ""}
@@ -583,7 +627,42 @@ function showCitationModal(citeId) {
   citationModal.classList.add("open");
 }
 
-async function openSourceViewer(cite) {
+function evidenceDates(cite) {
+  const retrieved = cite.retrieved_at ? new Date(cite.retrieved_at * 1000).toLocaleString() : "Not recorded";
+  return `Published: ${cite.published_at || "Unknown"} · Retrieved: ${retrieved}`;
+}
+
+function showFindingEvidence(index) {
+  const finding = currentReport?.key_findings?.[index];
+  if (!finding) return;
+  const body = document.getElementById("citationModalBody");
+  document.getElementById("citationModalTitle").textContent = `Evidence for finding ${index + 1}`;
+  body.innerHTML = `<p class="evidence-claim">${escapeHtml(finding.content)}</p>` + (finding.citations || []).map(id => {
+    const cite = currentReport.citations.find(c => c.id === id);
+    if (!cite) return "";
+    const link = (finding.evidence || []).find(e => e.citation_id === id);
+    const label = cite.evidence_type === "grounded_claim" ? "Google Search annotation · not independently verified" : link ? "Copied support checked against the source excerpt" : "Citation excerpt · claim support not recorded";
+    let webLink = "";
+    try {
+      const url = new URL(cite.url_or_page);
+      if (["https:", "http:"].includes(url.protocol)) webLink = `<a href="${escapeHtml(url.href)}" target="_blank" rel="noopener noreferrer">Open cited page ↗</a>`;
+    } catch (_) { /* Document source or absent URL. */ }
+    return `<div class="evidence-card"><h4>[${id}] ${escapeHtml(cite.title)}</h4>
+      <p>${escapeHtml(label)}</p><blockquote>${escapeHtml(link?.quote || cite.snippet)}</blockquote>
+      <p class="evidence-date">${escapeHtml(evidenceDates(cite))}</p>
+      ${cite.doc_id && cite.chunk_id ? `<button class="btn btn-secondary evidence-source" data-citation="${id}">Open original passage</button>` : webLink}</div>`;
+  }).join("");
+  body.querySelectorAll(".evidence-source").forEach(button => button.addEventListener("click", () => {
+    const id = Number(button.dataset.citation);
+    const cite = currentReport.citations.find(c => c.id === id);
+    const quote = (finding.evidence || []).find(e => e.citation_id === id)?.quote;
+    citationModal.classList.remove("open");
+    openSourceViewer(cite, quote);
+  }));
+  citationModal.classList.add("open");
+}
+
+async function openSourceViewer(cite, supportQuote = null) {
   const status = document.getElementById("sourceViewerStatus");
   const textBox = document.getElementById("sourceViewerText");
   const pdfPanel = document.getElementById("sourcePdfPanel");
@@ -600,17 +679,17 @@ async function openSourceViewer(cite) {
     if (!response.ok) throw new Error("Source excerpt is unavailable. It may have been deleted.");
     const source = await response.json();
     const finding = currentReport?.key_findings?.find(item => item.citations?.includes(cite.id));
-    const selectedQuote = finding?.content?.replace(/\s*\[\d+\]\s*$/, "").replace(/\.\.\.$/, "").trim();
+    const selectedQuote = supportQuote || finding?.evidence?.find(e => e.citation_id === cite.id)?.quote || finding?.content?.replace(/\s*\[\d+\]\s*$/, "").replace(/\.\.\.$/, "").trim();
     const sourceSnippet = cite.snippet.replace(/\.\.\.$/, "").trim();
     const excerpt = selectedQuote && source.content.includes(selectedQuote) ? selectedQuote : sourceSnippet;
     const offset = source.content.indexOf(excerpt);
     textBox.innerHTML = offset >= 0
       ? `${escapeHtml(source.content.slice(0, offset))}<mark>${escapeHtml(excerpt)}</mark>${escapeHtml(source.content.slice(offset + excerpt.length))}`
       : escapeHtml(source.content);
-    status.textContent = `Page ${source.page_number || 1} · Highlighted indexed passage`;
+    status.textContent = `Page ${source.page_number || 1} · ${offset >= 0 ? "Highlighted indexed passage" : "Original indexed passage"}`;
     if (source.pdf_available) {
       pdfPanel.style.display = "block";
-      image.src = `/api/documents/${encodeURIComponent(cite.doc_id)}/pages/${source.page_number || 1}/preview?quote=${encodeURIComponent(excerpt)}`;
+      image.src = `/api/documents/${encodeURIComponent(cite.doc_id)}/pages/${source.page_number || 1}/preview?quote=${encodeURIComponent(excerpt.slice(0, 240))}`;
     } else if (cite.source_type === "document" && cite.title.toLowerCase().includes(".pdf")) {
       status.textContent += " · Original PDF unavailable; re-upload to enable PDF preview";
     }
@@ -638,7 +717,7 @@ async function openEvaluation() {
       ["Mean search time", `${metrics.mean_latency_ms.toFixed(1)} ms`]
     ];
     container.innerHTML = `
-      <p class="evaluation-description">${escapeHtml(data.dataset)} · ${data.questions} questions · ${data.documents} documents · ${data.chunks} chunks</p>
+      <p class="evaluation-description">Keyword candidate benchmark · ${escapeHtml(data.dataset)} · ${data.questions} questions · ${data.documents} documents · ${data.chunks} chunks</p>
       <div class="evaluation-metrics">${cards.map(([name, value]) => `
         <div class="evaluation-metric"><strong>${value}</strong><span>${name}</span></div>
       `).join("")}</div>
@@ -667,6 +746,15 @@ async function openEvaluation() {
         </tr>`).join("")}</tbody>
       </table></div>
     `;
+    if (data.semantic) {
+      const semantic = data.semantic;
+      container.insertAdjacentHTML("beforeend", `<h4>Keyword vs semantic retrieval · ${semantic.cases.length} independent cases</h4>
+        <p class="evaluation-description">A small synthetic corpus with direct questions, paraphrases, and unrelated questions. These results do not establish general accuracy.</p>
+        <table class="evaluation-table"><thead><tr><th>Method</th><th>Hit @ 1</th><th>Hit @ 3</th><th>Abstention</th></tr></thead><tbody>
+        ${Object.entries(semantic.metrics).map(([mode, scores]) => `<tr><td>${escapeHtml(mode)}</td><td>${(scores.hit_at_1 * 100).toFixed(1)}%</td><td>${(scores.hit_at_3 * 100).toFixed(1)}%</td><td>${(scores.abstention * 100).toFixed(1)}%</td></tr>`).join("")}</tbody></table>
+        <details><summary>Inspect each query</summary><table class="evaluation-table"><thead><tr><th>Question</th><th>Expected</th><th>Keyword</th><th>Hybrid</th></tr></thead><tbody>
+        ${semantic.cases.map(row => `<tr><td>${escapeHtml(row.query)}</td><td>${escapeHtml(row.expected || "No match")}</td><td>${escapeHtml(row.keyword.top || "No match")}</td><td>${escapeHtml(row.hybrid.top || "No match")}</td></tr>`).join("")}</tbody></table></details>`);
+    }
   } catch (error) {
     container.textContent = error.message;
   }
@@ -771,11 +859,13 @@ async function exportReportMarkdown() {
       const lines = [`# ${currentReport.query}`, "", currentReport.executive_summary, ""];
       for (const finding of currentReport.key_findings || []) {
         lines.push(`## ${finding.heading}`, finding.content, "");
+        for (const evidence of finding.evidence || []) lines.push(`> Support [${evidence.citation_id}] (${evidence.verification}): ${evidence.quote}`, "");
       }
       if (currentReport.citations?.length) {
         lines.push("## Sources", "");
         for (const cite of currentReport.citations) {
           lines.push(`- [${cite.id}] ${cite.title}${cite.url_or_page ? ` — ${cite.url_or_page}` : ""}`);
+          lines.push(`  ${evidenceDates(cite)}`);
         }
       }
       blob = new Blob([lines.join("\n")], { type: "text/markdown" });
@@ -861,6 +951,7 @@ async function loadHistory() {
 }
 
 window.loadReportById = async function(reportId) {
+  if (isRunning) return;
   try {
     const res = await fetch(`/api/reports/${reportId}`);
     if (!res.ok) {
@@ -868,6 +959,7 @@ window.loadReportById = async function(reportId) {
       return;
     }
     const report = await res.json();
+    reportTrail.length = 0;
     currentReport = report;
     renderReport(report);
     historyModal.classList.remove("open");

@@ -1,9 +1,11 @@
 import asyncio
 import json
 import time
+import hashlib
+import re
 from typing import AsyncGenerator, Dict, Any, List, Optional
 from backend.models import (
-    ResearchRequest, PlanStep, AgentAction, Citation, ResearchReport
+    ResearchRequest, PlanStep, AgentAction, Citation, ResearchReport, Finding, ClaimEvidence
 )
 from backend.rag.vector_store import VectorStore
 from backend.agent.tools import (
@@ -12,6 +14,7 @@ from backend.agent.tools import (
 from backend.agent.gemini_client import GeminiClient
 from backend.agent.query_planner import research_queries
 from backend.agent.page_reader import fetch_page_excerpt
+from backend.agent.cache import TTLCache
 
 
 from backend.db.database import Database
@@ -55,9 +58,52 @@ class ResearchOrchestrator:
         self.web_tool = WebSearchTool()
         self.synth_tool = DataSynthesisTool()
         self.kg_tool = KnowledgeGraphBuilderTool()
+        self.web_cache = TTLCache()
+        self.report_cache = TTLCache(max_entries=64, ttl=3600)
+
+    @staticmethod
+    def _web_key(client, query):
+        scope = hashlib.sha256(client.api_key.encode()).hexdigest()
+        return (scope, client.model, " ".join(query.casefold().split()))
+
+    def get_report(self, report_id):
+        return self.db.get_report(report_id) if self.db else self.report_cache.get(report_id)
+
+    async def _follow_up(self, request, client, parent):
+        question = request.query
+        selected = None
+        match = re.search(r"\b(?:point|finding|claim)\s+(\d+|one|two|three|four)\b", question, re.I)
+        if match:
+            value = match.group(1).lower()
+            index = int(value) if value.isdigit() else {"one": 1, "two": 2, "three": 3, "four": 4}[value]
+            if 1 <= index <= len(parent.key_findings):
+                selected = parent.key_findings[index - 1]
+            else:
+                return ResearchReport(query=question, executive_summary="That finding does not exist in this report.",
+                                      metrics={"mode": "no_evidence", "parent_report_id": parent.id})
+        sources = [c for c in parent.citations if selected is None or c.id in selected.citations]
+        context = json.dumps({"original_question": parent.query,
+                              "findings": [f.content for f in ([selected] if selected else parent.key_findings)]})
+        report = await asyncio.to_thread(client.synthesize_final_report, question, [], sources,
+                                         request.depth, context=context)
+        if selected and report.metrics.get("mode") == "no_evidence":
+            # Without a usable model response, show the referenced source text explicitly.
+            findings = [Finding(heading=c.title, content=f"{c.snippet} [{c.id}]", citations=[c.id],
+                        evidence=[ClaimEvidence(citation_id=c.id, quote=c.snippet,
+                        verification="search_grounding" if c.evidence_type == "grounded_claim" else "exact_quote")]) for c in sources]
+            report = ResearchReport(query=question, executive_summary="The referenced evidence is shown below.",
+                                    key_findings=findings, citations=sources, metrics={"mode": "followup_evidence"})
+        report.metrics["parent_report_id"] = parent.id
+        report.metrics["evidence_scope"] = "existing_report"
+        return report
 
     async def _search_web(self, client: GeminiClient, query: str) -> Dict[str, Any]:
         """Search each comparison subject, preferring annotated Google Search claims."""
+        cache_key = self._web_key(client, query)
+        cached = self.web_cache.get(cache_key)
+        if cached:
+            cached["cache_hit"] = True
+            return cached
         queries = research_queries(query)
         gathered = []
         groups = []
@@ -73,13 +119,15 @@ class ResearchOrchestrator:
                 result = await self.web_tool.execute_async(subquery, num_results=3)
             elif result.get("source") == "google_search_grounding":
                 items = result["results"][:3]
+                page_metadata = [{} for _ in items]
                 excerpts = await asyncio.gather(*(
-                    fetch_page_excerpt(item["url"], subquery) for item in items
+                    fetch_page_excerpt(item["url"], subquery, metadata=meta) for item, meta in zip(items, page_metadata)
                 ))
-                for item, excerpt in zip(items, excerpts):
+                for item, excerpt, meta in zip(items, excerpts, page_metadata):
                     if excerpt:
                         item["snippet"] = excerpt
                         item["evidence_type"] = "source_excerpt"
+                        item["published_at"] = meta.get("published_at")
             providers.append(result.get("source", "unavailable"))
             group = []
             for item in result.get("results", [])[:3]:
@@ -88,8 +136,13 @@ class ResearchOrchestrator:
                     gathered.append(item)
                     group.append(len(gathered) - 1)
             groups.append(group)
-        return {"source": ",".join(providers), "query": query, "results": gathered[:6],
-                "comparison_groups": groups if len(groups) > 1 else None}
+        result = {"source": ",".join(providers), "query": query, "results": gathered[:6],
+                  "comparison_groups": groups if len(groups) > 1 else None,
+                  "retrieved_at": time.time(), "cache_hit": False,
+                  "fallback_used": any(p != "google_search_grounding" for p in providers)}
+        if result["results"]:
+            self.web_cache.put(cache_key, result)
+        return result
 
     async def execute_stream(self, request: ResearchRequest) -> AsyncGenerator[Dict[str, Any], None]:
         start_time = time.time()
@@ -98,6 +151,21 @@ class ResearchOrchestrator:
 
         # Each request owns its Gemini client; a supplied key never changes shared state.
         client = GeminiClient(api_key=request.api_key) if request.api_key else self.gemini_client
+
+        if request.parent_report_id:
+            parent = await asyncio.to_thread(self.get_report, request.parent_report_id)
+            if parent is None:
+                yield {"event": "error", "data": {"message": "Previous report expired or was deleted. Reopen or rerun it."}}
+                return
+            yield {"event": "status", "data": {"message": "Answering from this report's existing evidence..."}}
+            report = await self._follow_up(request, client, parent)
+            report.metrics["total_duration_seconds"] = round(time.time() - start_time, 2)
+            if self.db:
+                await asyncio.to_thread(self.db.save_report, report)
+            self.report_cache.put(report.id, report)
+            yield {"event": "report", "data": report.model_dump()}
+            yield {"event": "done", "data": {"report_id": report.id, "elapsed_seconds": report.metrics["total_duration_seconds"], "total_citations": len(report.citations)}}
+            return
 
         # 1. Summarize available document context
         doc_metas = self.vector_store.list_documents()
@@ -123,11 +191,13 @@ class ResearchOrchestrator:
         citation_id_counter = 1
         searched_documents = False
         searched_web = False
-        model_unavailable = False
+        model_unavailable = request.search_web and client.has_api_key() and not client.grounding_available()
+        cached_web = self.web_cache.get(self._web_key(client, query)) if request.search_web else None
 
         # Main model path: one stateful, streamed interaction with built-in Search
         # and the document tool. Follow-up turns continue the same interaction.
-        if client.has_api_key() and request.search_web:
+        if (client.grounding_available() and request.search_web and not cached_web
+                and not doc_names and len(research_queries(query)) == 1):
             try:
                 tool_defs = [{"type": "google_search"}]
                 if request.use_documents:
@@ -163,6 +233,12 @@ class ResearchOrchestrator:
                             report.metrics["total_duration_seconds"] = round(time.time() - start_time, 2)
                             report.metrics["citations_count"] = len(report.citations)
                             report.metrics["web_provider"] = "google_search_grounding"
+                            self.report_cache.put(report.id, report)
+                            self.web_cache.put(self._web_key(client, query), {
+                                "source": "google_search_grounding", "query": query,
+                                "results": [{"title": c.title, "snippet": c.snippet, "url": c.url_or_page,
+                                             "evidence_type": c.evidence_type} for c in report.citations],
+                                "retrieved_at": time.time(), "fallback_used": False})
                             if self.db:
                                 await asyncio.to_thread(self.db.save_report, report)
                             yield {"event": "report", "data": report.model_dump()}
@@ -182,13 +258,14 @@ class ResearchOrchestrator:
                             args = step.arguments or {}
                             if isinstance(args, str):
                                 args = json.loads(args)
-                            doc_res = self.doc_tool.execute(
+                            doc_res = await asyncio.to_thread(self.doc_tool.execute,
                                 query=args.get("query", query), top_k=min(int(args.get("top_k", 3)), 5),
                                 filter_doc_ids=doc_ids if doc_ids else None,
                             )
                             for chunk_data in doc_res.get("chunks", []):
                                 cite = Citation(
                                     id=citation_id_counter, source_type="document",
+                                    retrieved_at=time.time(),
                                     title=f"{chunk_data['doc_name']} (Page {chunk_data['page'] or 1})",
                                     snippet=chunk_data["content"][:1200],
                                     relevance_score=chunk_data["similarity"],
@@ -215,153 +292,6 @@ class ResearchOrchestrator:
                     model_unavailable = True
                     client._grounding_unavailable_until = time.monotonic() + 300
 
-        # Check if we can run true autonomous Gemini function calling
-        if client.has_api_key() and not model_unavailable and request.search_web and len(research_queries(query)) == 1:
-            try:
-                step1 = plan[0]
-                yield {"event": "step_start", "data": {"step_id": step1.id}}
-
-                system_prompt = (
-                    f"You are InsightPilot, an autonomous research agent investigating: '{query}'. "
-                    f"Available tools: {', '.join(name for name, enabled in [('search_documents', request.use_documents), ('search_web', request.search_web)] if enabled)}. "
-                    f"Use these tools to gather facts before synthesizing a final answer."
-                )
-
-                interaction = await asyncio.to_thread(
-                    client.create_interaction,
-                    input_data=system_prompt,
-                    tools=[tool for tool in client.get_registered_tools() if
-                           (tool['name'] == 'search_documents' and request.use_documents) or
-                           (tool['name'] == 'search_web' and request.search_web)]
-                )
-
-                turn = 0
-                max_turns = 4
-                current_step_id = 1
-
-                while interaction and turn < max_turns:
-                    turn += 1
-                    steps = interaction.steps or []
-                    has_tool_call = False
-
-                    for step in steps:
-                        # If model emitted internal reasoning
-                        if step.type == "thought":
-                            thought_text = getattr(step, "summary", "") or "Evaluating evidence and deciding next action."
-                            yield {
-                                "event": "thought",
-                                "data": {"step_id": current_step_id, "thought": thought_text}
-                            }
-                            await asyncio.sleep(0.3)
-
-                        elif step.type == "function_call":
-                            has_tool_call = True
-                            tool_name = step.name
-                            args = step.arguments or {}
-
-                            # Map plan step status
-                            if current_step_id <= len(plan):
-                                yield {"event": "step_start", "data": {"step_id": current_step_id}}
-
-                            yield {
-                                "event": "action",
-                                "data": {
-                                    "step_id": current_step_id,
-                                    "tool_name": tool_name,
-                                    "input": args
-                                }
-                            }
-
-                            t0 = time.time()
-                            tool_result_str = ""
-
-                            if tool_name == "search_documents" and request.use_documents:
-                                searched_documents = True
-                                q = args.get("query", query)
-                                top_k = args.get("top_k", 3)
-                                doc_res = self.doc_tool.execute(query=q, top_k=top_k, filter_doc_ids=doc_ids if doc_ids else None)
-                                latency = round((time.time() - t0) * 1000, 1)
-
-                                for chunk_data in doc_res.get("chunks", []):
-                                    cite = Citation(
-                                        id=citation_id_counter,
-                                        source_type="document",
-                                        title=f"{chunk_data['doc_name']} (Page {chunk_data['page'] or 1})",
-                                        snippet=chunk_data["content"][:1200] + ("..." if len(chunk_data["content"]) > 1200 else ""),
-                                        relevance_score=chunk_data["similarity"],
-                                        url_or_page=f"Page {chunk_data['page']}" if chunk_data.get('page') else "Document Chunk",
-                                        doc_id=chunk_data["doc_id"],
-                                        chunk_id=chunk_data["chunk_id"],
-                                        page_number=chunk_data["page"]
-                                    )
-                                    citations.append(cite)
-                                    yield {"event": "citation_added", "data": cite.model_dump()}
-                                    citation_id_counter += 1
-
-                                obs_summary = f"Retrieved {doc_res['found']} relevant document chunks from ingested repository."
-                                yield {
-                                    "event": "observation",
-                                    "data": {"step_id": current_step_id, "observation": obs_summary, "latency_ms": latency}
-                                }
-                                observations.append({"tool": tool_name, "data": doc_res})
-                                tool_result_str = str(doc_res)
-
-                            elif tool_name == "search_web" and request.search_web:
-                                searched_web = True
-                                q = args.get("query", query)
-                                web_res = await self._search_web(client, q)
-                                latency = round((time.time() - t0) * 1000, 1)
-
-                                for w in web_res.get("results", []):
-                                    cite = Citation(
-                                        id=citation_id_counter,
-                                        source_type="web",
-                                        title=w["title"],
-                                        snippet=w["snippet"][:500] + ("..." if len(w["snippet"]) > 500 else ""),
-                                        evidence_type=w.get("evidence_type", "source_excerpt"),
-                                        relevance_score=0.0,
-                                        url_or_page=w["url"]
-                                    )
-                                    citations.append(cite)
-                                    yield {"event": "citation_added", "data": cite.model_dump()}
-                                    citation_id_counter += 1
-
-                                web_count = len(web_res.get("results", []))
-                                obs_summary = f"Retrieved {web_count} relevant web {'source' if web_count == 1 else 'sources'}."
-                                yield {
-                                    "event": "observation",
-                                    "data": {"step_id": current_step_id, "observation": obs_summary, "latency_ms": latency}
-                                }
-                                observations.append({"tool": tool_name, "data": web_res})
-                                tool_result_str = str(web_res)
-
-                            else:
-                                tool_result_str = "Tool unavailable for this request."
-
-                            yield {"event": "step_complete", "data": {"step_id": current_step_id}}
-                            current_step_id = min(current_step_id + 1, len(plan))
-                            await asyncio.sleep(0.3)
-
-                            # Send tool execution result back to Gemini
-                            interaction = await asyncio.to_thread(
-                                client.create_interaction,
-                                previous_interaction_id=interaction.id,
-                                input_data=[{
-                                    "type": "function_result",
-                                    "name": step.name,
-                                    "call_id": step.id,
-                                    "result": tool_result_str
-                                }]
-                            )
-
-                    # If model didn't ask for any more tools, it is ready to synthesize
-                    if not has_tool_call:
-                        break
-
-            except Exception as e:
-                print(f"[ResearchOrchestrator] Dynamic interaction error: {e}. Falling back to guided execution.")
-                # We will fall through to ensure citations and final report are synthesized reliably
-
         # Complete any tool retrieval that the model did not perform.
         if ((request.use_documents and not searched_documents) or
                 (request.search_web and not searched_web)):
@@ -373,7 +303,7 @@ class ResearchOrchestrator:
                     "data": {"step_id": step1.id, "thought": f"Querying vector database for primary source documentation regarding '{query}'."}
                 }
                 t0 = time.time()
-                doc_result = self.doc_tool.execute(query=query, top_k=3, filter_doc_ids=doc_ids if doc_ids else None)
+                doc_result = await asyncio.to_thread(self.doc_tool.execute, query=query, top_k=3, filter_doc_ids=doc_ids if doc_ids else None)
                 latency1 = round((time.time() - t0) * 1000, 1)
 
                 yield {
@@ -388,6 +318,7 @@ class ResearchOrchestrator:
                     cite = Citation(
                         id=citation_id_counter,
                         source_type="document",
+                        retrieved_at=time.time(),
                         title=f"{chunk_data['doc_name']} (Page {chunk_data['page'] or 1})",
                         snippet=chunk_data["content"][:1200] + ("..." if len(chunk_data["content"]) > 1200 else ""),
                         relevance_score=chunk_data["similarity"],
@@ -431,6 +362,7 @@ class ResearchOrchestrator:
                         title=w["title"],
                         snippet=w["snippet"][:500] + ("..." if len(w["snippet"]) > 500 else ""),
                         evidence_type=w.get("evidence_type", "source_excerpt"),
+                        published_at=w.get("published_at"),
                         relevance_score=0.0,
                         url_or_page=w["url"]
                     )
@@ -439,6 +371,10 @@ class ResearchOrchestrator:
                     citation_id_counter += 1
 
                 observations.append({"tool": "web_search", "data": web_result})
+                yield {"event": "status", "data": {"message":
+                    "Using cached web sources." if web_result.get("cache_hit") else
+                    "Using fallback web sources; Google grounding is unavailable." if web_result.get("fallback_used") else
+                    "Retrieved Google-grounded sources."}}
                 if web_result.get("comparison_groups"):
                     base_id = citation_id_counter - len(web_result["results"])
                     observations.append({"comparison_groups": [
@@ -476,6 +412,16 @@ class ResearchOrchestrator:
             item["data"].get("source", "unavailable") for item in observations
             if item.get("tool") in {"web_search", "search_web"}
         )
+        report.metrics["web_cache_hit"] = any(item.get("data", {}).get("cache_hit") for item in observations)
+        report.metrics["web_fallback_used"] = any(item.get("data", {}).get("fallback_used") for item in observations)
+        report.metrics["retrieval_mode"] = next((item["data"].get("retrieval_mode", "keyword")
+            for item in observations if item.get("tool") in {"document_retrieval", "search_documents"}), None)
+        retrieved_at = next((item["data"].get("retrieved_at") for item in observations
+                             if item.get("tool") in {"web_search", "search_web"}), None)
+        for citation in report.citations:
+            if citation.source_type == "web":
+                citation.retrieved_at = retrieved_at
+        self.report_cache.put(report.id, report)
 
         # Auto-save report to SQLite database
         if self.db:

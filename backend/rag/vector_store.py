@@ -4,6 +4,8 @@ import os
 import re
 import sqlite3
 import threading
+import json
+import math
 from typing import List, Optional, Tuple
 
 from backend.models import DocumentChunk, DocumentMetadata
@@ -12,8 +14,9 @@ from backend.models import DocumentChunk, DocumentMetadata
 class VectorStore:
     """SQLite FTS5 backed retrieval. The legacy name is kept for API compatibility."""
 
-    def __init__(self, gemini_client=None, db_path: Optional[str] = None):
+    def __init__(self, gemini_client=None, db_path: Optional[str] = None, embedder=None):
         self.gemini_client = gemini_client
+        self.embedder = embedder
         data_dir = os.environ.get("DATA_DIR") or os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
         )
@@ -30,6 +33,7 @@ class VectorStore:
             self._connection.execute("CREATE TABLE IF NOT EXISTS document_files (doc_id TEXT PRIMARY KEY, content BLOB NOT NULL)")
             self._connection.execute("CREATE INDEX IF NOT EXISTS chunks_doc_id ON chunks(doc_id)")
             self._connection.execute("CREATE VIRTUAL TABLE IF NOT EXISTS chunk_search USING fts5(chunk_id UNINDEXED, content)")
+            self._connection.execute("CREATE TABLE IF NOT EXISTS chunk_vectors (chunk_id TEXT, model TEXT, vector TEXT NOT NULL, PRIMARY KEY(chunk_id, model))")
 
     @property
     def chunks(self) -> List[DocumentChunk]:
@@ -60,6 +64,7 @@ class VectorStore:
                                          (chunk.id, chunk.content))
 
     def _delete_document(self, doc_id: str) -> None:
+        self._connection.execute("DELETE FROM chunk_vectors WHERE chunk_id IN (SELECT id FROM chunks WHERE doc_id = ?)", (doc_id,))
         self._connection.execute("DELETE FROM document_files WHERE doc_id = ?", (doc_id,))
         self._connection.execute("DELETE FROM chunk_search WHERE chunk_id IN (SELECT id FROM chunks WHERE doc_id = ?)", (doc_id,))
         self._connection.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
@@ -142,3 +147,58 @@ class VectorStore:
             coverage = len(query_terms & chunk_terms) / len(query_terms)
             results.append((chunk, round(coverage, 3)))
         return results
+
+    def ranked_search(self, query: str, top_k=3, filter_doc_ids=None):
+        """Fuse BM25 and dense candidates, then rerank with semantic and lexical relevance."""
+        from backend.agent.relevance import terms, coverage
+        query_terms = terms(query)
+        if not query_terms or top_k <= 0 or filter_doc_ids == []:
+            return [], "keyword"
+        lexical = self.similarity_search(" ".join(query_terms), max(top_k * 4, 12), filter_doc_ids) if query_terms else []
+        lexical_scores = {chunk.id: coverage(query_terms, chunk.content) for chunk, _ in lexical}
+        fallback = sorted(((chunk, lexical_scores[chunk.id]) for chunk, _ in lexical
+                           if lexical_scores[chunk.id]), key=lambda item: item[1], reverse=True)[:top_k]
+        if not self.embedder or not self.embedder.prepare():
+            return fallback, "keyword"
+        try:
+            with self._lock:
+                # Keep the document snapshot and its persisted vectors consistent with deletion.
+                chunks = [chunk for chunk in self.chunks if filter_doc_ids is None or chunk.doc_id in filter_doc_ids]
+                if not chunks:
+                    return [], "hybrid"
+                model = self.embedder.model_name
+                vectors = {row[0]: json.loads(row[1]) for row in self._connection.execute(
+                    "SELECT chunk_id, vector FROM chunk_vectors WHERE model = ?", (model,)).fetchall()}
+                missing = [chunk for chunk in chunks if chunk.id not in vectors]
+                if missing:
+                    embedded = self.embedder.passages([chunk.content for chunk in missing])
+                    if len(embedded) != len(missing):
+                        raise ValueError("Incomplete embedding batch")
+                    with self._connection:
+                        for chunk, vector in zip(missing, embedded):
+                            vectors[chunk.id] = vector
+                            self._connection.execute("INSERT OR REPLACE INTO chunk_vectors VALUES (?, ?, ?)",
+                                                     (chunk.id, model, json.dumps(vector)))
+                query_vector = self.embedder.query(query)
+                def cosine(vector):
+                    if len(vector) != len(query_vector):
+                        raise ValueError("Embedding dimensions changed")
+                    denominator = math.sqrt(sum(v*v for v in vector) * sum(v*v for v in query_vector))
+                    return sum(a*b for a,b in zip(vector, query_vector)) / denominator if denominator else 0.0
+                dense = sorted(((chunk, cosine(vectors[chunk.id])) for chunk in chunks),
+                               key=lambda item: item[1], reverse=True)
+            dense_scores = {chunk.id: score for chunk, score in dense}
+            fusion = {}
+            for ranking in (lexical, dense[:max(top_k * 4, 12)]):
+                for rank, (chunk, _) in enumerate(ranking, start=1):
+                    fusion[chunk.id] = fusion.get(chunk.id, 0) + 1 / (60 + rank)
+            candidates = []
+            for chunk, semantic in dense:
+                lexical_score = lexical_scores.get(chunk.id, 0)
+                if chunk.id not in fusion or (not lexical_score and semantic < 0.60):
+                    continue
+                score = 0.65 * semantic + 0.20 * lexical_score + 0.15 * fusion[chunk.id] * 30
+                candidates.append((chunk, round(score, 3)))
+            return sorted(candidates, key=lambda item: item[1], reverse=True)[:top_k], "hybrid"
+        except Exception:
+            return fallback, "keyword_fallback"

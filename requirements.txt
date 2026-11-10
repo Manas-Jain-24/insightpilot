@@ -8,3 +8,4 @@ pypdfium2==5.14.0
 Pillow==12.3.0
 httpx==0.28.1
 google-genai==2.31.0
+fastembed==0.9.1

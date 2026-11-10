@@ -127,6 +127,23 @@ cp .env.example .env
 
 Open **Evaluation** in the top bar to run the bundled offline benchmarks. Retrieval cases use [`evaluation/questions.json`](evaluation/questions.json); answer checks use [`evaluation/answer_cases.json`](evaluation/answer_cases.json) to measure answer relevance, citation wiring, and abstention. These checks do not establish whether statements in source documents are true or score live Gemini responses.
 
+Prepare semantic search once after installing dependencies:
+
+```bash
+python scripts/prepare_embeddings.py
+python scripts/run_retrieval_eval.py
+```
+
+The BGE small English model runs locally through FastEmbed. It combines dense candidates with SQLite keyword candidates using reciprocal rank fusion, then reranks by semantic similarity and lexical relevance. Vectors are stored with their model identifier and removed when their document is deleted. Runtime requests never download models. If the model is missing or fails, keyword retrieval remains available. Set `SEMANTIC_SEARCH=false` to disable it. The included Render build prepares the model before starting the server. The current vector scan is intended for modest document collections; larger collections need a dedicated vector index.
+
+The Evaluation panel also compares keyword and hybrid retrieval on [`evaluation/semantic_cases.json`](evaluation/semantic_cases.json): six direct questions, ten paraphrases, and four unrelated questions over a separate synthetic corpus. The initial run found the expected top source for 15/16 answerable queries with hybrid search versus 6/16 with keyword search; both abstained on all four unrelated queries. The remaining outage-query miss is retained in the dataset. This small benchmark is not a general accuracy estimate.
+
+Each finding now has **Inspect evidence**, showing its supporting text, whether it was copied from an excerpt or supplied as a Google Search annotation, and publication/retrieval dates when known. A copied quote confirms attribution, not the truth or logical completeness of a generated claim. Older saved reports remain readable and show that claim-level support was not recorded.
+
+**Ask follow-up** uses the current report's existing citations. References such as “explain finding two” select that finding's sources. New answers can be saved and inspected like other reports; use **Back to previous report** to return. Local reports are resolved from SQLite; demo report context expires after one hour or a restart. New research is required to add sources.
+
+Web results are cached in memory for 15 minutes, with a maximum of 128 entries and separate credential/model scopes. Retrieval timestamps are preserved on cache hits. Transient Gemini failures receive at most one retry before output starts; partial streams and rate-limit errors are never replayed. A rate-limit cooldown prevents repeated grounding calls for five minutes. The report shows cache/fallback status. Actual project quotas must be checked in Google AI Studio; the app cannot infer account quota limits from the API key alone.
+
 For an opt-in evaluation of the live research workflow, set `GEMINI_API_KEY` in `.env` and run `python scripts/run_live_eval.py --limit 6 --output live-eval.json`. The six web questions include definition, explanation, comparison, and abstention cases. The output records the answer, expected concepts, citation wiring, response mode, rate limits, and latency per question. This uses API quota; keyword checks and citation wiring do not prove factual accuracy. Use `--limit 1` for a quick smoke test.
 
 ### 3. Launch the Server

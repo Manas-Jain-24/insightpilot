@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     autoDeployTrigger: checksPass
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python scripts/prepare_embeddings.py
     startCommand: uvicorn backend.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:

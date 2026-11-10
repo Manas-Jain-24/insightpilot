@@ -1,0 +1,33 @@
+{
+  "description": "Independent paraphrase corpus for comparing production keyword and hybrid retrieval. No query-specific expansion rules.",
+  "documents": [
+    {"id": "refunds", "text": "Subscription payments may be reimbursed within fourteen days of purchase. Customers request reimbursement from the billing team and include their receipt number."},
+    {"id": "library", "text": "Borrowers can extend a library loan twice through the online catalogue. An item reserved by another reader cannot be renewed."},
+    {"id": "backup", "text": "The backup service encrypts archived files before uploading them. Recovery requires the original secret key; losing that key makes the archive unreadable."},
+    {"id": "outage", "text": "When the production service becomes unavailable, the on-call engineer rolls back the latest deployment. The incident commander posts progress updates every fifteen minutes."},
+    {"id": "access", "text": "Employees who forget their password can recover access through a verification link sent to their registered email address. The link expires after thirty minutes."},
+    {"id": "leave", "text": "Staff members receive twenty days of paid annual leave. Requests must be approved by the employee's manager before travel is booked."}
+  ],
+  "cases": [
+    {"query": "Subscription payments reimbursed fourteen days", "expected": "refunds"},
+    {"query": "Library loan online catalogue renew", "expected": "library"},
+    {"query": "Backup service encrypts archived files", "expected": "backup"},
+    {"query": "Incident commander progress updates", "expected": "outage"},
+    {"query": "Password verification link expires", "expected": "access"},
+    {"query": "Paid annual leave manager requests", "expected": "leave"},
+    {"query": "Can I get my money back after buying a subscription?", "expected": "refunds"},
+    {"query": "Who handles payment refunds and what proof do they need?", "expected": "refunds"},
+    {"query": "How can I keep a borrowed book for longer?", "expected": "library"},
+    {"query": "Can I renew a book that someone else is waiting for?", "expected": "library"},
+    {"query": "Can I restore saved files if I lose the decryption secret?", "expected": "backup"},
+    {"query": "How are archived documents protected before transfer?", "expected": "backup"},
+    {"query": "The website went down after a release. What should the engineer do?", "expected": "outage"},
+    {"query": "How often should we communicate during a service disruption?", "expected": "outage"},
+    {"query": "I cannot remember my login credentials. How do I get back in?", "expected": "access"},
+    {"query": "How much vacation can a worker take each year?", "expected": "leave"},
+    {"query": "How do coral reefs reproduce?", "expected": null},
+    {"query": "What temperature should sourdough bread bake at?", "expected": null},
+    {"query": "What caused the extinction of dinosaurs?", "expected": null},
+    {"query": "What is the recommended telescope aperture for observing Saturn?", "expected": null}
+  ]
+}
