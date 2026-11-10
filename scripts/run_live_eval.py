@@ -25,7 +25,11 @@ def score_report(case, report):
     summary = report.executive_summary.casefold()
     abstained = report.metrics.get("mode") == "no_evidence"
     expected = case.get("expected_terms", [])
-    match = abstained if case.get("abstain") else all(term.casefold() in summary for term in expected)
+    concepts = case.get("expected_concepts", [])
+    match = abstained if case.get("abstain") else (
+        all(term.casefold() in summary for term in expected)
+        and all(any(option.casefold() in summary for option in group) for group in concepts)
+    )
     ids = {citation.id for citation in report.citations}
     valid = bool(report.citations) and all(
         finding.citations and all(cid in ids and f"[{cid}]" in finding.content
@@ -54,9 +58,13 @@ async def evaluate(cases, client):
             except Exception as exc:
                 error = f"{type(exc).__name__}: {exc}"
             row = {"query": case["query"], "latency_seconds": round(time.monotonic() - started, 2),
+                   "expected_terms": case.get("expected_terms", []),
+                   "expected_concepts": case.get("expected_concepts", []),
+                   "expected_abstention": bool(case.get("abstain")),
                    "mode": report.metrics.get("mode") if report else None,
                    "model_rate_limited": bool(report and report.metrics.get("model_rate_limited")),
                    "citation_count": len(report.citations) if report else 0,
+                   "summary": report.executive_summary if report else None,
                    "error": error, **score_report(case, report)}
             rows.append(row)
             print(f"{len(rows)}/{len(cases)} {row['mode'] or row['error'] or 'no report'}: {case['query']}", flush=True)
@@ -66,6 +74,7 @@ async def evaluate(cases, client):
     return {"model": client.model, "questions": total,
             "metrics": {"answer_match_rate": round(sum(r["answer_match"] for r in rows) / total, 3),
                         "citation_validity_rate": round(sum(r["citations_valid"] for r in rows) / total, 3),
+                        "rate_limited_questions": sum(r["model_rate_limited"] for r in rows),
                         "median_latency_seconds": sorted(r["latency_seconds"] for r in rows)[total // 2]},
             "cases": rows}
 

@@ -86,6 +86,18 @@ class VectorStore:
             ).fetchone()
         return DocumentChunk.model_validate_json(row[0]) if row else None
 
+    def following_chunks(self, doc_id: str, chunk_index: int, limit: int = 2) -> List[DocumentChunk]:
+        """Return nearby source chunks when an answer spans a chunk boundary."""
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT payload FROM chunks WHERE doc_id = ? "
+                "AND CAST(json_extract(payload, '$.chunk_index') AS INTEGER) > ? "
+                "AND CAST(json_extract(payload, '$.chunk_index') AS INTEGER) <= ? "
+                "ORDER BY CAST(json_extract(payload, '$.chunk_index') AS INTEGER) LIMIT ?",
+                (doc_id, chunk_index, chunk_index + limit, limit),
+            ).fetchall()
+        return [DocumentChunk.model_validate_json(row[0]) for row in rows]
+
     def get_pdf_bytes(self, doc_id: str) -> Optional[bytes]:
         with self._lock:
             row = self._connection.execute(

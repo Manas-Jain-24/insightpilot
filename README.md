@@ -127,7 +127,7 @@ cp .env.example .env
 
 Open **Evaluation** in the top bar to run the bundled offline benchmarks. Retrieval cases use [`evaluation/questions.json`](evaluation/questions.json); answer checks use [`evaluation/answer_cases.json`](evaluation/answer_cases.json) to measure answer relevance, citation wiring, and abstention. These checks do not establish whether statements in source documents are true or score live Gemini responses.
 
-For an opt-in evaluation of actual Gemini answers, set `GEMINI_API_KEY` in `.env` and run `python scripts/run_live_eval.py --limit 6 --output live-eval.json`. The six web questions include definition, explanation, comparison, and abstention cases. The output records answer term matches, citation wiring, response mode, and latency per question. This uses API quota; term matching and citation wiring are useful checks, but do not prove factual accuracy. Use `--limit 1` for a quick smoke test.
+For an opt-in evaluation of the live research workflow, set `GEMINI_API_KEY` in `.env` and run `python scripts/run_live_eval.py --limit 6 --output live-eval.json`. The six web questions include definition, explanation, comparison, and abstention cases. The output records the answer, expected concepts, citation wiring, response mode, rate limits, and latency per question. This uses API quota; keyword checks and citation wiring do not prove factual accuracy. Use `--limit 1` for a quick smoke test.
 
 ### 3. Launch the Server
 

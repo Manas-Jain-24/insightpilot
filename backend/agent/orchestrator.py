@@ -216,7 +216,7 @@ class ResearchOrchestrator:
                     client._grounding_unavailable_until = time.monotonic() + 300
 
         # Check if we can run true autonomous Gemini function calling
-        if client.has_api_key() and not model_unavailable and len(research_queries(query)) == 1 and (request.use_documents or request.search_web):
+        if client.has_api_key() and not model_unavailable and request.search_web and len(research_queries(query)) == 1:
             try:
                 step1 = plan[0]
                 yield {"event": "step_start", "data": {"step_id": step1.id}}

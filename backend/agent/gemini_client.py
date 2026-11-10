@@ -316,7 +316,9 @@ Example:
                     for c in citations[:20]
                 )
                 prompt = f"""Answer this research question using only the numbered evidence: {query!r}.
-Write up to four concise claims that directly answer it. For each claim, include one citation ID
+Write up to four concise claims that directly answer it. If the question asks for stages,
+steps, or items in a list, include every distinct item explicitly listed in the evidence,
+up to four, in the source's order. For each claim, include one citation ID
 and a support string copied exactly from that citation's text (at least 24 characters).
 Paraphrase only when the support clearly entails the claim. For comparisons, cover both subjects
 and state a difference only when the evidence supports it. If the evidence is insufficient,

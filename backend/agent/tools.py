@@ -24,6 +24,15 @@ class DocumentRetrievalTool:
         results = [(chunk, coverage(query_terms, chunk.content)) for chunk, _ in results]
         results = sorted(((chunk, score) for chunk, score in results if score),
                          key=lambda item: item[1], reverse=True)[:top_k]
+        if re.search(r"\b(stages?|steps?|phases?|items?|list)\b", query, re.I):
+            seen = {chunk.id for chunk, _ in results}
+            context = []
+            for chunk, _ in results:
+                for neighbor in self.vector_store.following_chunks(chunk.doc_id, chunk.chunk_index):
+                    if neighbor.id not in seen:
+                        seen.add(neighbor.id)
+                        context.append((neighbor, coverage(query_terms, neighbor.content)))
+            results += context[:3]
         if not results:
             return {
                 "found": 0,

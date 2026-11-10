@@ -1,5 +1,5 @@
 [
-  {"query": "What is a heckler's veto?", "expected_terms": ["audience", "speaker"]},
+  {"query": "What is a heckler's veto?", "expected_concepts": [["speaker", "speech"], ["silenced", "canceled", "curtailed", "restricted"]]},
   {"query": "How does photosynthesis work?", "expected_terms": ["sunlight", "energy"]},
   {"query": "What does the ReAct framework combine?", "expected_terms": ["reasoning", "action"]},
   {"query": "What caused the 2008 financial crisis?", "expected_terms": ["subprime", "mortgage"]},

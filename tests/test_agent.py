@@ -57,6 +57,19 @@ class TestInsightPilot(unittest.TestCase):
         self.vector_store.add_document(metadata, [chunk])
         self.assertEqual(DocumentRetrievalTool(self.vector_store).execute("What is photosynthesis?")["found"], 0)
 
+    def test_list_question_includes_adjacent_source_chunks(self):
+        sample_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                   "sample_data", "ai_agent_architectures.md")
+        meta, chunks = self.loader.load_file(sample_path, "ai_agent_architectures.md")
+        self.vector_store.add_document(meta, chunks)
+        found = DocumentRetrievalTool(self.vector_store).execute(
+            "What are the stages of the ReAct loop?", top_k=3
+        )
+        text = " ".join(chunk["content"] for chunk in found["chunks"])
+        self.assertIn("Reflection / Termination", text)
+        self.assertTrue(all(self.vector_store.get_chunk(meta.id, chunk["chunk_id"])
+                            for chunk in found["chunks"]))
+
     def test_web_search_tool_async(self):
         transport = httpx.MockTransport(lambda request: httpx.Response(200, json={
             "Heading": "Quantum computing", "AbstractText": "Quantum computers use qubits.",

@@ -5,19 +5,44 @@ import json
 import unittest
 import httpx
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from backend.agent.gemini_client import GeminiClient
 from backend.agent.orchestrator import ResearchOrchestrator
 from backend.agent.query_planner import research_queries
 from backend.agent.page_reader import fetch_page_excerpt, _public_https_url
 from backend.eval.benchmark import run_answer_benchmark
-from backend.models import Citation, ResearchRequest
+from backend.models import Citation, ResearchReport, ResearchRequest
 from backend.rag.vector_store import VectorStore
 from scripts.run_live_eval import score_report
 
 
 class ResearchQualityTests(unittest.TestCase):
+    def test_document_only_research_skips_repeated_model_tool_turns(self):
+        client = GeminiClient(api_key="")
+        client.api_key = "test"
+        client._client = SimpleNamespace()
+        client.create_interaction = Mock(side_effect=AssertionError("unexpected tool turn"))
+        client.synthesize_final_report = Mock(return_value=ResearchReport(
+            query="What are the ReAct stages?", executive_summary="No evidence.",
+            metrics={"mode": "no_evidence"},
+        ))
+        store = VectorStore(db_path=":memory:")
+        try:
+            agent = ResearchOrchestrator(store, client)
+            agent.doc_tool.execute = Mock(return_value={"found": 0, "chunks": []})
+            async def collect():
+                return [event async for event in agent.execute_stream(ResearchRequest(
+                    query="What are the ReAct stages?", search_web=False,
+                ))]
+            events = asyncio.run(collect())
+            self.assertTrue(any(event["event"] == "report" for event in events))
+            client.create_interaction.assert_not_called()
+            client.synthesize_final_report.assert_called_once()
+            agent.doc_tool.execute.assert_called_once()
+        finally:
+            store.close()
+
     def test_streamed_grounded_answer_uses_combined_tools(self):
         body = "A heckler's veto occurs when a hostile audience prevents a speaker from being heard."
         annotation = SimpleNamespace(type="url_citation", url="https://example.org/speech",
@@ -72,6 +97,13 @@ class ResearchQualityTests(unittest.TestCase):
         result = score_report({"expected_terms": ["hostile audience", "speaker"]}, report)
         self.assertTrue(result["answer_match"])
         self.assertFalse(result["citations_valid"])
+
+    def test_live_eval_accepts_equivalent_heckler_veto_wording(self):
+        report = ResearchReport(query="heckler's veto",
+                                executive_summary="A party can cause a speaker to be silenced.")
+        case = {"expected_concepts": [["audience", "party"],
+                                      ["silenced", "restricted"]]}
+        self.assertTrue(score_report(case, report)["answer_match"])
 
     def test_comparison_queries_are_decomposed(self):
         self.assertEqual(
