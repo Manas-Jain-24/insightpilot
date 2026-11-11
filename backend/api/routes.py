@@ -175,6 +175,10 @@ def create_router(
         """Streams real-time ReAct agent steps and final synthesis via Server-Sent Events (SSE)."""
         if mode == "demo" and request.api_key:
             raise HTTPException(status_code=403, detail="Visitor API keys are disabled in the public demo")
+        if request.use_documents and request.document_ids and not request.parent_report_id:
+            available = {doc.id for doc in vector_store.list_documents()}
+            if any(doc_id not in available for doc_id in request.document_ids):
+                raise HTTPException(status_code=422, detail="A selected document is no longer available. Refresh the document list and choose again.")
         demo_limit(http_request, "research", 6, 30)
         if request.parent_report_id and not await asyncio.to_thread(orchestrator.get_report, request.parent_report_id):
             raise HTTPException(status_code=404, detail="Previous report expired or was deleted. Rerun it to continue.")

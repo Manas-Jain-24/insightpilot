@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>InsightPilot | Autonomous Multimodal Research & Knowledge Agent</title>
+  <title>InsightPilot | Research with inspectable evidence</title>
   <meta name="description" content="AI research assistant with document search, web retrieval, and live source-backed reports.">
   
   <!-- Modern Typography -->
@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="/static/css/styles.css?v=research-upgrades-1">
+  <link rel="stylesheet" href="/static/css/styles.css?v=research-workspace-2">
 </head>
 <body>
 
@@ -21,22 +21,22 @@
       <div class="brand-icon">🧠</div>
       <div class="brand-text">
         <h1>InsightPilot</h1>
-        <span>Autonomous Research Agent</span>
+        <span>Research with inspectable evidence</span>
       </div>
     </div>
 
     <div class="nav-actions">
       <div class="status-badge" id="agentStatusBadge">
         <span class="pulse-dot"></span>
-        <span id="agentStatusText">ReAct Agent Ready</span>
+        <span id="agentStatusText">Ready to research</span>
       </div>
 
       <button class="btn btn-secondary" id="btnOpenDocs" title="Manage Ingested Documents">
-        📁 Ingested Docs (<span id="docsCountPill">0</span>)
+        <span>📁 Documents (<span id="docsCountPill">0</span>)</span>
       </button>
 
       <button class="btn btn-secondary" id="btnOpenHistory" title="View Saved Research Reports">
-        📜 History (<span id="historyCountPill">0</span>)
+        <span>📜 History (<span id="historyCountPill">0</span>)</span>
       </button>
 
       <button class="btn btn-secondary" id="btnOpenEvaluation" title="Open the repeatable retrieval benchmark">
@@ -55,8 +55,8 @@
     <!-- Hero / Query Input Console -->
     <section class="hero-card">
       <div class="hero-header">
-        <h2>Autonomous Multimodal Research & Knowledge Synthesis</h2>
-        <p>Enter a research question. InsightPilot searches your documents and, if enabled, the web, then shows a source-backed report.</p>
+        <h2>Ask a question. Inspect the evidence.</h2>
+        <p>Choose your sources, get a cited answer, and open the passages behind each finding.</p>
           <p id="demoNotice" hidden>Public demo: answers are selected from source excerpts. Broad comparisons and current events need stronger sources or a configured model. Uploads and saved history are available when running locally.</p>
       </div>
 
@@ -64,7 +64,9 @@
         <textarea 
           id="queryInput" 
           class="prompt-textarea" 
-          placeholder="e.g. Compare Hybrid RAG with Graph RAG architectures regarding retrieval latency, token efficiency, and grounded factual accuracy..."
+          placeholder="What would you like to understand or compare?"
+          aria-label="Research question"
+          maxlength="1000"
           rows="2"
         ></textarea>
 
@@ -73,9 +75,9 @@
             <div class="select-pill">
               <span>Depth:</span>
               <select id="depthSelect">
-                <option value="quick">Quick Brief (1-2 Min)</option>
-                <option value="balanced" selected>Balanced Research (3-5 Min)</option>
-                <option value="deep">Deep Investigative (Multi-Pass)</option>
+                <option value="quick">Quick brief</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="deep">Detailed</option>
               </select>
             </div>
 
@@ -86,33 +88,41 @@
 
             <label class="select-pill" style="cursor: pointer;">
               <input type="checkbox" id="checkUseWeb" checked style="accent-color: var(--accent-cyan);">
-              <span>Search Web Knowledge</span>
+              <span>Include web sources</span>
             </label>
           </div>
 
           <button id="btnRunAgent" class="btn btn-primary">
-            <span>⚡ Launch Agentic Research</span>
+            <span>Research question</span>
           </button>
         </div>
       </div>
 
+      <details class="source-scope" id="sourceScope">
+        <summary id="sourceScopeSummary">Choose documents · loading library…</summary>
+        <div class="scope-controls">
+          <label><input id="searchAllDocuments" type="checkbox" checked> Search all documents</label>
+          <span id="scopeHelp">Uncheck to search only selected documents.</span>
+        </div>
+        <div id="documentScopeList" class="document-scope-list"></div>
+      </details>
+
       <!-- 1-Click Demo Quick Picks -->
       <div class="quick-topics">
-        <span class="quick-label">⚡ Demo Quick-Picks:</span>
-        <span class="chip-tag" data-query="What are the latest architectures and evaluation benchmarks for autonomous multi-agent systems and ReAct loops in 2025/2026?">
-          🤖 Autonomous Agent Architectures
-        </span>
-        <span class="chip-tag" data-query="Compare Hybrid RAG (Dense + Sparse retrieval) with Graph-based RAG in terms of latency, token cost, and factual grounding.">
-          🔍 Hybrid vs Graph RAG
-        </span>
-        <span class="chip-tag" data-query="Analyze recent breakthroughs in quantum error correction and industry migration timelines for NIST Post-Quantum Cryptography.">
-          ⚛️ Quantum & PQC Standards
-        </span>
-        <span class="chip-tag" data-query="How does the InsightPilot source viewer highlight a cited PDF passage?">
-          📄 Try PDF Source Viewer
-        </span>
+        <span class="quick-label">Try a sample:</span>
+        <button type="button" class="chip-tag" disabled data-document="ai_agent_architectures.md" data-query="What are the steps in a ReAct loop?">Explain an agent loop</button>
+        <button type="button" class="chip-tag" disabled data-document="ai_agent_architectures.md" data-query="How does hybrid retrieval combine keyword and semantic search?">Understand hybrid search</button>
+        <button type="button" class="chip-tag" disabled data-document="quantum_computing_2025.txt" data-query="What is harvest now, decrypt later?">Explore a security concept</button>
+        <button type="button" class="chip-tag" disabled data-document="source_viewer_demo.pdf" data-query="How does the InsightPilot source viewer highlight a cited PDF passage?">Inspect a PDF passage</button>
       </div>
+      <p class="sample-note">Samples use bundled illustrative documents, not a verified news feed. Selecting a sample fills the question and its source; press Research question to run it.</p>
     </section>
+
+    <div id="runStatus" class="run-status" hidden>
+      <p id="runStatusText" role="status" aria-live="polite"></p>
+      <button id="btnCancelResearch" type="button" class="btn btn-secondary" hidden>Stop research</button>
+      <button id="btnRetryResearch" type="button" class="btn btn-secondary" hidden>Retry question</button>
+    </div>
 
     <!-- Workspace Grid -->
     <div class="workspace-grid">
@@ -121,7 +131,7 @@
       <aside class="trace-panel">
         <div class="panel-title">
           <h3>
-            <span>🔬</span> Agent Cognitive Trace
+            <span>🔬</span> Research Activity
           </h3>
           <span id="traceTimer" style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--text-muted);">0.0s</span>
         </div>
@@ -132,7 +142,7 @@
             <div class="step-badge">1</div>
             <div class="step-info">
               <h4>Planning & Task Decomposition</h4>
-              <p>Formulate multi-pass execution trajectory</p>
+              <p>Plan searches for the question</p>
             </div>
           </div>
           <div class="step-card">
@@ -162,7 +172,7 @@
         <div class="trace-log" id="traceLogsContainer">
           <div class="log-entry thought">
             <div class="log-header thought-header">System Initialized</div>
-            <p>Agent standing by. Enter a research topic above or click a demo quick-pick to initiate the autonomous loop.</p>
+            <p>Search activity and source checks appear here while your research runs.</p>
           </div>
         </div>
       </aside>
@@ -173,8 +183,8 @@
         <!-- Empty State Before Run -->
         <div class="empty-state" id="reportEmptyState">
           <div class="empty-icon">📊</div>
-          <h3>Intelligence Report Workspace</h3>
-          <p>Launch a research run to see retrieved sources and checked excerpts appear here.</p>
+          <h3>Your research starts here</h3>
+          <p>1. Ask a question and choose sources.<br>2. Read the findings and inspect their evidence.<br>3. Ask a follow-up using the same sources.</p>
         </div>
 
         <!-- Generated Report Container (Initially Hidden) -->
@@ -384,6 +394,7 @@
     </div>
   </div>
 
-  <script src="/static/js/app.js?v=research-upgrades-1"></script>
+  <script src="/static/js/research-stream.js?v=research-workspace-2"></script>
+  <script src="/static/js/app.js?v=research-workspace-2"></script>
 </body>
 </html>

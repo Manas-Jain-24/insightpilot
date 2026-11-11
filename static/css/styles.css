@@ -973,3 +973,35 @@ body {
 .followup-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .75rem; }
 .inspect-evidence { margin: .5rem 0; }
 [hidden] { display: none !important; }
+
+/* Source selection and recoverable research runs. */
+.source-scope { margin-top: 1rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: .9rem 1rem; }
+.source-scope summary { cursor: pointer; color: var(--text-main); font-size: .9rem; }
+.scope-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.5rem; margin: 1rem 0; font-size: .85rem; }
+.scope-controls span, .sample-note { color: var(--text-muted); font-size: .78rem; line-height: 1.6; }
+.document-scope-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .6rem; max-height: 260px; overflow: auto; }
+.document-choice { display: flex; align-items: start; gap: .6rem; padding: .75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); font-size: .83rem; overflow-wrap: anywhere; }
+.document-choice input { margin-top: .2rem; accent-color: var(--accent-cyan); }
+.document-choice small { display: block; color: var(--text-muted); margin-top: .3rem; }
+.sample-note { margin-top: .6rem; }
+button.chip-tag { font-family: inherit; text-align: left; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 3px; }
+.run-status { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin-bottom: 1.25rem; padding: 1rem; border: 1px solid var(--border-subtle); border-left: 3px solid var(--accent-cyan); border-radius: var(--radius-sm); background: var(--bg-secondary); }
+.run-status p { flex: 1 1 260px; line-height: 1.6; overflow-wrap: anywhere; font-size: .9rem; }
+.run-status[data-state="error"] { border-left-color: var(--accent-rose); }
+.run-status[data-state="complete"] { border-left-color: var(--accent-emerald); }
+@media (max-width: 520px) { .document-scope-list { grid-template-columns: 1fr; } }
+@media print { .run-status, .source-scope { display: none; } }
+.navbar { flex-wrap: wrap; gap: 1rem; }
+.brand { flex-shrink: 0; }
+.nav-actions { flex-wrap: wrap; }
+.nav-actions .btn, .nav-actions .status-badge { white-space: nowrap; }
+@media (max-width: 600px) {
+  .navbar { position: static; padding: 1rem; }
+  .nav-actions { gap: .5rem; }
+  .nav-actions .btn { padding: .5rem .7rem; }
+  .app-container { padding: 1rem .75rem; }
+  .hero-card { padding: 1.25rem; }
+  .brand-text span { font-size: .65rem; }
+}

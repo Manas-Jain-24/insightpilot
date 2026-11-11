@@ -95,6 +95,8 @@ class ResearchOrchestrator:
                                     key_findings=findings, citations=sources, metrics={"mode": "followup_evidence"})
         report.metrics["parent_report_id"] = parent.id
         report.metrics["evidence_scope"] = "existing_report"
+        if "source_scope" in parent.metrics:
+            report.metrics["source_scope"] = parent.metrics["source_scope"]
         return report
 
     async def _search_web(self, client: GeminiClient, query: str) -> Dict[str, Any]:
@@ -170,6 +172,8 @@ class ResearchOrchestrator:
         # 1. Summarize available document context
         doc_metas = self.vector_store.list_documents()
         doc_names = [d.filename for d in doc_metas if request.use_documents and (not doc_ids or d.id in doc_ids)]
+        source_scope = {"documents": doc_names, "web_enabled": request.search_web,
+                        "selection": "selected" if doc_ids else "all"}
 
         # 2. Plan Generation
         yield {
@@ -233,6 +237,7 @@ class ResearchOrchestrator:
                             report.metrics["total_duration_seconds"] = round(time.time() - start_time, 2)
                             report.metrics["citations_count"] = len(report.citations)
                             report.metrics["web_provider"] = "google_search_grounding"
+                            report.metrics["source_scope"] = source_scope
                             self.report_cache.put(report.id, report)
                             self.web_cache.put(self._web_key(client, query), {
                                 "source": "google_search_grounding", "query": query,
@@ -408,6 +413,7 @@ class ResearchOrchestrator:
         total_elapsed = round(time.time() - start_time, 2)
         report.metrics["total_duration_seconds"] = total_elapsed
         report.metrics["citations_count"] = len(report.citations)
+        report.metrics["source_scope"] = source_scope
         report.metrics["web_provider"] = ",".join(
             item["data"].get("source", "unavailable") for item in observations
             if item.get("tool") in {"web_search", "search_web"}

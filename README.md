@@ -1,11 +1,11 @@
 <div align="center">
 
 # 🧠 InsightPilot
-### Autonomous Multimodal Research & Knowledge Agent
+### Research with inspectable evidence
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Gemini](https://img.shields.io/badge/Google%20GenAI-Gemini%203.8%20Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Python](https://img.shields.io/badge/Python-3.13-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Gemini](https://img.shields.io/badge/Google%20GenAI-Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 [![Pydantic](https://img.shields.io/badge/Pydantic-V2-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
@@ -21,9 +21,9 @@
 
 **InsightPilot** searches uploaded documents and web sources, then writes a concise answer with cited evidence for a research question.
 
-Unlike conventional single-turn LLM chatbots that hallucinate citations and suffer from static context limits, InsightPilot deploys a **ReAct (Reasoning + Acting) execution loop**:
+InsightPilot combines a research orchestrator with document retrieval and optional Gemini synthesis:
 1. **Plans & Deconstructs** complex research queries into atomic sub-goals.
-2. **Retrieves & Ranks** document chunks via SQLite full-text search (RAG).
+2. **Retrieves & Ranks** document chunks using SQLite keyword search and local semantic embeddings.
 3. **Calls External Tools** to ingest real-time web knowledge and state-of-the-art benchmarks.
 4. **Checks Quotes** selected by Gemini against the cited excerpts. Unsupported selections are dropped.
 5. **Streams Progress** and the resulting source excerpts via Server-Sent Events (SSE).
@@ -78,10 +78,11 @@ Unlike conventional single-turn LLM chatbots that hallucinate citations and suff
 
 ## ✨ Key Features
 
-- **Autonomous ReAct Agent Loop**: Explicit cognitive decomposition where the agent reasons, invokes tools, observes results, and evaluates completion.
+- **Research orchestration**: Plans searches, retrieves sources, checks selected quotes, and streams progress. Document-only questions use a retrieval-and-synthesis path; eligible web questions use a streamed model interaction.
+- **Source selection and run controls**: Search all documents or a selected subset, optionally include web sources, and see the requested scope on each new report. Sample questions select their bundled document and wait for you to start. Stop an in-progress request or retry the same question and scope after failure; the previous report is restored if no new report arrived. Stopping closes the browser request; an already-running external API call may still finish.
 - **Indexed Retrieval-Augmented Generation (RAG)**:
   - Multi-format ingestion (`.pdf`, `.md`, `.txt`, `.json`, `.csv`) with recursive sliding-window chunking and sentence boundary preservation.
-  - Persistent SQLite FTS5 search with BM25 ranking and page-level source tracking.
+  - SQLite FTS5/BM25 combined with local BGE embeddings, reciprocal rank fusion, and page-level source tracking.
 - **Quote Verification**: Gemini selects excerpts, and the server accepts only substantial quotes copied from the matching cited source. Unsupported selections are dropped; if all fail, the report falls back to source excerpts.
 - **Source Viewer**: Document citations open the indexed passage with a highlighted quote. Uploaded PDFs are retained locally and open at the cited page beside the passage. Older PDFs uploaded before this feature need to be uploaded again for preview.
 - **Evaluation Dashboard**: A 36-question local benchmark reports hit@1, hit@3, source match, abstention, reciprocal rank, and retrieval latency. The dataset and every case result are visible in the app.
@@ -233,4 +234,8 @@ Here is how you can describe this project on your resume:
 
 ## 📄 License
 
-MIT License. Built for portfolio demonstration and production AI engineering showcases.
+MIT License. Built for portfolio demonstration and experimentation.
+
+### Frontend stream checks
+
+Run `node --test tests/test_research_stream.cjs` to check split UTF-8 events, CRLF framing, incomplete streams, server errors, and cancellation. CI runs these alongside the Python suite.

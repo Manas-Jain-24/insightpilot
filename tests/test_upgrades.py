@@ -38,6 +38,43 @@ def seed(store):
 
 
 class UpgradeTests(unittest.TestCase):
+    def test_request_trims_query_and_rejects_blank_or_oversized_scope(self):
+        from pydantic import ValidationError
+        self.assertEqual(ResearchRequest(query="  research  ").query, "research")
+        for payload in ({"query": "   "}, {"query": " a "},
+                        {"query": "research", "document_ids": ["doc"] * 101}):
+            with self.assertRaises(ValidationError):
+                ResearchRequest(**payload)
+
+    def test_api_scope_rejects_missing_documents_and_excludes_other_sources(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from backend.api.routes import create_router
+        store = VectorStore(db_path=":memory:")
+        self.addCleanup(store.close)
+        seed(store)
+        app = FastAPI()
+        app.include_router(create_router(store, GeminiClient(api_key="")), prefix="/api")
+        with TestClient(app) as client:
+            missing = client.post("/api/research/stream", json={"query": "Request reimbursement",
+                "search_web": False, "document_ids": ["billing", "deleted"]})
+            self.assertEqual(missing.status_code, 422)
+            self.assertIn("no longer available", missing.json()["detail"])
+            response = client.post("/api/research/stream", json={"query": "Request reimbursement",
+                "search_web": False, "document_ids": ["billing"]})
+            self.assertEqual(response.status_code, 200)
+            events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
+            report = next(e["data"] for e in events if e["event"] == "report")
+            self.assertTrue(report["citations"])
+            self.assertEqual({c["doc_id"] for c in report["citations"]}, {"billing"})
+            self.assertEqual(report["metrics"]["source_scope"], {
+                "documents": ["billing.txt"], "web_enabled": False, "selection": "selected"})
+            other = client.post("/api/research/stream", json={"query": "Request reimbursement",
+                "search_web": False, "document_ids": ["library"]})
+            other_events = [json.loads(line[6:]) for line in other.text.splitlines() if line.startswith("data: ")]
+            other_report = next(e["data"] for e in other_events if e["event"] == "report")
+            self.assertEqual(other_report["citations"], [])
+
     def test_grounding_cooldown_skips_model_and_reuses_fallback_cache(self):
         store = VectorStore(db_path=":memory:")
         self.addCleanup(store.close)
@@ -220,6 +257,13 @@ class UpgradeTests(unittest.TestCase):
             restored = db.get_report(report.id)
             self.assertEqual(restored.key_findings[0].evidence, report.key_findings[0].evidence)
             self.assertEqual(restored.citations[0].published_at, "2026-01-02")
+            self.assertEqual(db.list_reports()[0]["model"], "Model not recorded")
+            report.metrics["mode"] = "extractive_fallback"
+            db.save_report(report)
+            self.assertEqual(db.list_reports()[0]["model"], "Source excerpts")
+            report.metrics["model"] = "recorded-model"
+            db.save_report(report)
+            self.assertEqual(db.list_reports()[0]["model"], "recorded-model")
 
     def test_publication_date_is_read_only_from_valid_metadata(self):
         parser = _Paragraphs()

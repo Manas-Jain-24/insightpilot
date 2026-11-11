@@ -20,4 +20,8 @@ jobs:
       - name: Run backend tests
         run: python -m unittest discover -s tests
       - name: Check frontend syntax
-        run: node --check static/js/app.js
+        run: |
+          node --check static/js/app.js
+          node --check static/js/research-stream.js
+      - name: Test research stream handling
+        run: node --test tests/test_research_stream.cjs

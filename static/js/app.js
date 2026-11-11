@@ -10,6 +10,10 @@ let isRunning = false;
 let startTime = null;
 let timerInterval = null;
 let kgAnimationId = null;
+let indexedDocuments = [];
+const selectedDocumentIds = new Set();
+let activeRequest = null;
+let lastAttempt = null;
 let appConfig = { mode: "local", uploads_enabled: true, history_enabled: true, visitor_api_keys_enabled: true };
 
 // DOM Elements
@@ -67,6 +71,12 @@ const btnExportMarkdown = document.getElementById("btnExportMarkdown");
 const btnPrintReport = document.getElementById("btnPrintReport");
 const sourceModal = document.getElementById("sourceModal");
 const evaluationModal = document.getElementById("evaluationModal");
+const searchAllDocuments = document.getElementById("searchAllDocuments");
+const documentScopeList = document.getElementById("documentScopeList");
+const runStatus = document.getElementById("runStatus");
+const runStatusText = document.getElementById("runStatusText");
+const btnCancelResearch = document.getElementById("btnCancelResearch");
+const btnRetryResearch = document.getElementById("btnRetryResearch");
 
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", async () => {
@@ -93,13 +103,37 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function setupEventListeners() {
   btnRunAgent.addEventListener("click", launchAgentResearch);
+  btnCancelResearch.addEventListener("click", () => activeRequest?.abort());
+  btnRetryResearch.addEventListener("click", () => {
+    if (lastAttempt) launchAgentResearch(lastAttempt);
+  });
+  checkUseDocs.addEventListener("change", renderDocumentScope);
+  searchAllDocuments.addEventListener("change", renderDocumentScope);
+  documentScopeList.addEventListener("change", (event) => {
+    const id = event.target.dataset.docId;
+    if (!id) return;
+    if (event.target.checked) selectedDocumentIds.add(id);
+    else selectedDocumentIds.delete(id);
+    renderDocumentScope();
+    [...documentScopeList.querySelectorAll("input")].find(input => input.dataset.docId === id)?.focus();
+  });
 
   // Quick topics chips
   document.querySelectorAll(".chip-tag").forEach(chip => {
     chip.addEventListener("click", () => {
+      if (isRunning) return;
       const q = chip.getAttribute("data-query");
       queryInput.value = q;
-      launchAgentResearch();
+      const source = indexedDocuments.find(doc => doc.filename === chip.dataset.document);
+      if (source) {
+        selectedDocumentIds.clear();
+        selectedDocumentIds.add(source.id);
+        searchAllDocuments.checked = false;
+        checkUseDocs.checked = true;
+        checkUseWeb.checked = false;
+        renderDocumentScope();
+      }
+      queryInput.focus();
     });
   });
 
@@ -172,11 +206,35 @@ function setupEventListeners() {
 }
 
 // ---------------- Document Ingestion ----------------
+function renderDocumentScope() {
+  const all = searchAllDocuments.checked;
+  const count = all ? indexedDocuments.length : selectedDocumentIds.size;
+  document.getElementById("sourceScopeSummary").textContent = checkUseDocs.checked
+    ? `Choose documents · ${all ? "all " : ""}${count} selected`
+    : "Document search is off";
+  searchAllDocuments.disabled = isRunning || !checkUseDocs.checked;
+  documentScopeList.innerHTML = indexedDocuments.length ? indexedDocuments.map(doc => `
+    <label class="document-choice">
+      <input type="checkbox" data-doc-id="${escapeHtml(doc.id)}"
+        ${all || selectedDocumentIds.has(doc.id) ? "checked" : ""}
+        ${all || !checkUseDocs.checked || isRunning ? "disabled" : ""}>
+      <span>${escapeHtml(doc.filename)}<small>${doc.chunks_count} indexed passages</small></span>
+    </label>`).join("") : '<p>No documents available. Add a document or enable web sources.</p>';
+  document.querySelectorAll(".chip-tag[data-document]").forEach(chip => {
+    chip.hidden = !indexedDocuments.some(doc => doc.filename === chip.dataset.document);
+    chip.disabled = isRunning;
+  });
+}
+
 async function loadDocuments() {
   try {
     const res = await fetch("/api/documents");
-    if (!res.ok) return;
+    if (!res.ok) throw new Error("Could not load documents");
     const docs = await res.json();
+    indexedDocuments = docs;
+    const available = new Set(docs.map(doc => doc.id));
+    for (const id of selectedDocumentIds) if (!available.has(id)) selectedDocumentIds.delete(id);
+    renderDocumentScope();
     docsCountPill.textContent = docs.length;
 
     if (docs.length === 0) {
@@ -199,6 +257,7 @@ async function loadDocuments() {
       </div>
     `).join("");
   } catch (err) {
+    document.getElementById("sourceScopeSummary").textContent = "Could not load documents · open Documents to retry";
     console.error("Error loading documents:", err);
   }
 }
@@ -265,20 +324,53 @@ document.getElementById("btnPreviousReport").addEventListener("click", () => {
 });
 
 async function launchAgentResearch(options = {}) {
-  const query = (options.followupQuery || queryInput.value).trim();
-  if (!query) {
-    alert("Please enter a research topic or query first.");
+  if (isRunning) return;
+  const query = (options.requestBody?.query || options.followupQuery || queryInput.value).trim();
+  const body = options.requestBody || {
+    query,
+    depth: depthSelect.value,
+    api_key: appConfig.visitor_api_keys_enabled ? apiKeyInput.value.trim() : null,
+    use_documents: checkUseDocs.checked,
+    search_web: checkUseWeb.checked,
+    document_ids: searchAllDocuments.checked ? [] : [...selectedDocumentIds],
+    parent_report_id: options.parentReport?.id || null
+  };
+  let validation = "";
+  if (query.length < 3) validation = "Enter a question with at least 3 characters.";
+  else if (!body.parent_report_id && !body.use_documents && !body.search_web) validation = "Choose documents or web sources before starting.";
+  else if (!options.requestBody && !body.parent_report_id && body.use_documents && !searchAllDocuments.checked && !body.document_ids.length) validation = "Select at least one document, or switch to searching all documents.";
+  else if (!options.requestBody && !body.parent_report_id && body.use_documents && !indexedDocuments.length && !body.search_web) validation = "Add a document or enable web sources before starting.";
+  if (validation) {
+    runStatus.hidden = false;
+    runStatus.dataset.state = "error";
+    runStatusText.textContent = validation;
+    btnRetryResearch.hidden = true;
     queryInput.focus();
     return;
   }
 
-  if (isRunning) return;
+  lastAttempt = { requestBody: body, parentReport: options.parentReport };
+  const previousReport = currentReport;
+  let receivedReport = false;
+  let completed = false;
   isRunning = true;
+  activeRequest = new AbortController();
+  runStatus.hidden = false;
+  runStatus.dataset.state = "running";
+  runStatusText.textContent = `Researching: ${query}`;
+  btnCancelResearch.hidden = false;
+  btnRetryResearch.hidden = true;
+  reportContent.style.display = "none";
+  reportEmptyState.style.display = "none";
+  reportPanel.setAttribute("aria-busy", "true");
+  [queryInput, depthSelect, checkUseDocs, checkUseWeb, ...document.querySelectorAll(".chip-tag")].forEach(input => input.disabled = true);
+  renderDocumentScope();
   btnRunAgent.disabled = true;
+  btnOpenHistory.disabled = true;
   document.getElementById("btnFollowUp").disabled = true;
   document.getElementById("btnPreviousReport").disabled = true;
   btnRunAgent.innerHTML = `<span>⏳ Researching...</span>`;
-  agentStatusText.textContent = "Agent Executing ReAct Loop...";
+  agentStatusText.textContent = "Research in progress";
   agentStatusBadge.style.color = "var(--accent-cyan)";
   agentStatusBadge.style.borderColor = "var(--accent-cyan)";
 
@@ -288,23 +380,12 @@ async function launchAgentResearch(options = {}) {
   startTime = Date.now();
   startTimer();
 
-  const apiKey = apiKeyInput.value.trim();
-  const depth = depthSelect.value;
-  const useDocs = checkUseDocs.checked;
-  const useWeb = checkUseWeb.checked;
-
   try {
     const response = await fetch("/api/research/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: query,
-        depth: depth,
-        api_key: appConfig.visitor_api_keys_enabled ? apiKey : null,
-        use_documents: useDocs,
-        search_web: useWeb,
-        parent_report_id: options.parentReport?.id || null
-      })
+      signal: activeRequest.signal,
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) {
@@ -312,44 +393,42 @@ async function launchAgentResearch(options = {}) {
       throw new Error(typeof error.detail === "string" ? error.detail : `Server returned status ${response.status}`);
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n\n");
-      buffer = lines.pop(); // keep last incomplete chunk
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const jsonStr = line.slice(6);
-          try {
-            const eventPayload = JSON.parse(jsonStr);
-            if (eventPayload.event === "report") {
-              if (options.parentReport) reportTrail.push(options.parentReport);
-              else reportTrail.length = 0;
-            }
-            handleStreamEvent(eventPayload);
-          } catch (e) {
-            console.error("Error parsing SSE JSON:", e, jsonStr);
-          }
-        }
+    await ResearchStream.consume(response.body, (eventPayload) => {
+      if (eventPayload.event === "report") {
+        if (options.parentReport) reportTrail.push(options.parentReport);
+        else reportTrail.length = 0;
+        receivedReport = true;
       }
-    }
+      handleStreamEvent(eventPayload);
+    });
+    completed = true;
+    runStatus.dataset.state = "complete";
+    runStatusText.textContent = `Research complete: ${query}`;
   } catch (err) {
-    addTraceLog("error", "Execution Error", err.message);
+    const stopped = err.name === "AbortError";
+    const message = stopped ? "Research stopped. You can change the question or retry." : err.message;
+    addTraceLog(stopped ? "observation" : "error", stopped ? "Research stopped" : "Research interrupted", message);
+    runStatus.dataset.state = stopped ? "stopped" : "error";
+    runStatusText.textContent = `${message}${previousReport && !receivedReport ? " Your previous report is shown below." : ""}`;
+    btnRetryResearch.hidden = false;
+    if (!receivedReport && previousReport) {
+      currentReport = previousReport;
+      renderReport(previousReport);
+    } else if (!receivedReport) reportEmptyState.style.display = "flex";
   } finally {
     stopTimer();
     isRunning = false;
+    activeRequest = null;
+    btnCancelResearch.hidden = true;
+    reportPanel.setAttribute("aria-busy", "false");
+    [queryInput, depthSelect, checkUseDocs, checkUseWeb, ...document.querySelectorAll(".chip-tag")].forEach(input => input.disabled = false);
+    renderDocumentScope();
     btnRunAgent.disabled = false;
+    btnOpenHistory.disabled = false;
     document.getElementById("btnFollowUp").disabled = false;
     document.getElementById("btnPreviousReport").disabled = false;
-    btnRunAgent.innerHTML = `<span>⚡ Launch Agentic Research</span>`;
-    agentStatusText.textContent = "ReAct Agent Ready";
+    btnRunAgent.innerHTML = `<span>Research question</span>`;
+    agentStatusText.textContent = completed ? "Report ready" : "Ready to retry";
     agentStatusBadge.style.color = "var(--accent-emerald)";
     agentStatusBadge.style.borderColor = "rgba(16, 185, 129, 0.25)";
   }
@@ -362,6 +441,7 @@ function handleStreamEvent(eventObj) {
   switch (event) {
     case "status":
       addTraceLog("observation", "Research status", data.message);
+      runStatusText.textContent = data.message;
       break;
     case "plan":
       renderPlanSteps(data);
@@ -372,7 +452,7 @@ function handleStreamEvent(eventObj) {
       break;
 
     case "thought":
-      addTraceLog("thought", "Cognitive Reasoning (Thought)", data.thought);
+      addTraceLog("thought", "Research step", data.thought);
       break;
 
     case "action":
@@ -482,10 +562,16 @@ function renderReport(report) {
   document.getElementById("followupInput").value = "";
   document.getElementById("btnPreviousReport").hidden = reportTrail.length === 0 && !(appConfig.history_enabled && report.metrics?.parent_report_id);
   const notices = [];
+  const scope = report.metrics?.source_scope;
+  if (scope) {
+    const documents = scope.documents.length ? `${scope.documents.length} document${scope.documents.length === 1 ? "" : "s"} (${scope.documents.slice(0, 3).join(", ")}${scope.documents.length > 3 ? ", …" : ""})` : "no documents";
+    notices.push(`Sources requested: ${documents}; web ${scope.web_enabled ? "enabled" : "off"}.`);
+  }
   if (report.metrics?.web_fallback_used || report.metrics?.model_rate_limited) notices.push("Google grounding is unavailable. This report uses available source excerpts.");
   if (report.metrics?.web_cache_hit) notices.push("Using cached web sources; their retrieval dates appear with the evidence.");
   if (report.metrics?.retrieval_mode) notices.push(report.metrics.retrieval_mode === "hybrid" ? "Document search used meaning and keywords." : "Document search used keywords.");
   if (report.metrics?.parent_report_id) notices.push("Follow-up based on the previous report's sources.");
+  if (["extractive_fallback", "semantic_excerpts"].includes(report.metrics?.mode)) notices.push("Showing extracted passages. They may not answer every part of your question; inspect the sources for context.");
   const notice = document.getElementById("researchNotice");
   notice.textContent = notices.join(" ");
   notice.hidden = notices.length === 0;
@@ -607,7 +693,7 @@ function showCitationModal(citeId) {
   modalBody.innerHTML = `
     <div style="margin-bottom: 1rem;">
       <span class="status-badge" style="display: inline-flex;">${cite.source_type.toUpperCase()} SOURCE</span>
-      ${cite.source_type === "document" ? `<span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;">Query term match: ${(cite.relevance_score * 100).toFixed(0)}%</span>` : ""}
+      ${cite.source_type === "document" ? `<span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;">Retrieval score: ${Number(cite.relevance_score || 0).toFixed(2)} (not answer confidence)</span>` : ""}
     </div>
     <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: var(--radius-sm); border-left: 3px solid var(--accent-cyan); font-style: italic; color: #e2e8f0; font-size: 0.92rem; line-height: 1.6; margin-bottom: 1rem;">
       ${cite.evidence_type === "grounded_claim" ? "Search-grounded claim" : "Source excerpt"}: "${escapeHtml(cite.snippet)}"
@@ -927,7 +1013,7 @@ async function loadHistory() {
             <div class="history-meta">
               <span>${dateStr}</span>
               <span>•</span>
-              <span class="status-badge" style="padding: 0.15rem 0.5rem; font-size: 0.7rem;">${r.model || 'Gemini 3.8 Flash'}</span>
+              <span class="status-badge" style="padding: 0.15rem 0.5rem; font-size: 0.7rem;">${escapeHtml(r.model || 'Model not recorded')}</span>
               <span>•</span>
               <span>${r.citations_count} Citations</span>
               <span>•</span>

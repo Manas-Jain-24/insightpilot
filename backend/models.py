@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import time
 import uuid
 
@@ -86,11 +86,19 @@ class ResearchReport(BaseModel):
 class ResearchRequest(BaseModel):
     query: str = Field(..., min_length=3, max_length=1000)
     depth: Literal["quick", "balanced", "deep"] = "balanced"
-    document_ids: Optional[List[str]] = Field(default_factory=list)
+    document_ids: Optional[List[str]] = Field(default_factory=list, max_length=100)
     api_key: Optional[str] = None
     search_web: bool = True
     use_documents: bool = True
     parent_report_id: Optional[str] = Field(default=None, max_length=60, pattern=r"^rep_[a-zA-Z0-9_-]+$")
+
+    @field_validator("query")
+    @classmethod
+    def meaningful_query(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 3:
+            raise ValueError("Enter a question with at least 3 characters")
+        return value
 
 
 class DocumentChunk(BaseModel):
