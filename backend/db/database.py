@@ -117,7 +117,7 @@ class Database:
                     "model": metrics_dict.get("model") or (
                         "Source excerpts" if metrics_dict.get("mode") in {
                             "extractive_fallback", "extractive_list", "semantic_excerpts", "followup_evidence", "no_evidence"
-                        } else "Model not recorded")
+                        } else "Clarification needed" if metrics_dict.get("mode") == "clarification_needed" else "Model not recorded")
                 })
             return results
 

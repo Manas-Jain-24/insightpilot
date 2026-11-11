@@ -1,0 +1,745 @@
+{
+  "version": "research-quality-v1",
+  "description": "Synthetic fixture corpus with fictional operating rules. Evaluates the production document-only workflow without a model or web calls. Development and reserved validation questions were authored together; this is not an independent or blind benchmark.",
+  "documents": [
+    {
+      "id": "idempotency",
+      "title": "Idempotent operations",
+      "text": "An idempotent operation has the same effect when repeated as when performed once. The parcel API uses a request token to recognize duplicate submissions and avoid creating a second shipment."
+    },
+    {
+      "id": "backpressure",
+      "title": "Backpressure",
+      "text": "Backpressure slows a producer when a consumer cannot keep up. The queue uses backpressure because unchecked arrivals would exhaust memory. Producers pause until the queue has room again."
+    },
+    {
+      "id": "breaker",
+      "title": "Circuit breaker",
+      "text": "A circuit breaker stops requests to a failing dependency after repeated errors. After a cooldown, a trial request checks whether the dependency has recovered. This prevents repeated failures from overwhelming the caller."
+    },
+    {
+      "id": "bluegreen",
+      "title": "Blue-green releases",
+      "text": "A blue-green release keeps two environments: one serves live traffic while the other receives the new version. Traffic switches after health checks pass. Rollback switches traffic back to the previous environment."
+    },
+    {
+      "id": "parcel",
+      "title": "Lark parcel collection",
+      "text": "Lark depot holds parcels for three days. A recipient must bring photo identification and the collection code. Uncollected parcels return to the sender after the holding period. The depot closes at 18:00 on weekdays."
+    },
+    {
+      "id": "csv",
+      "title": "CSV export",
+      "text": "CSV export supports up to fifty thousand rows per file. CSV export flattens nested fields into columns. CSV export jobs expire after six hours."
+    },
+    {
+      "id": "json",
+      "title": "JSON export",
+      "text": "JSON export supports up to ten thousand records per file. JSON export preserves nested objects. JSON export jobs expire after twelve hours."
+    },
+    {
+      "id": "launch",
+      "title": "Field launch checklist",
+      "text": "# Field launch checklist\nThe field launch steps are:\n- Inspect the enclosure.\n- Charge the battery.\n- Calibrate the sensor.\n- Record the serial number.\n- Obtain supervisor approval.\n\n# Lunch arrangements\n- Order soup.\n- Collect bread."
+    },
+    {
+      "id": "archive",
+      "title": "Archive restoration",
+      "text": "# Archive restoration\nThe archive restoration steps are:\n1. Verify the checksum.\n2. Unlock the archive.\n3. Restore the files.\n4. Validate the restored copy.\n\nArchive restoration requires the recovery key. Without the recovery key the encrypted archive cannot be opened."
+    },
+    {
+      "id": "room",
+      "title": "Studio booking",
+      "text": "A studio booking lasts ninety minutes. Members may reserve a studio up to seven days ahead. Cancel a studio booking at least two hours before it starts to release the room to other members."
+    },
+    {
+      "id": "email",
+      "title": "Email verification",
+      "text": "An email verification link expires after twenty minutes. Requesting a replacement email verification link invalidates the earlier link. The system does not disclose whether an email address belongs to a registered account."
+    },
+    {
+      "id": "device",
+      "title": "Device activation",
+      "text": "A device activation link expires after forty minutes. Device activation requires the device serial number and an administrator approval code."
+    }
+  ],
+  "cases": [
+    {
+      "id": "def-1",
+      "category": "definition",
+      "split": "development",
+      "query": "What is an idempotent operation?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "idempotency"
+      ],
+      "facets": [
+        {
+          "name": "same effect",
+          "alternatives": [
+            "same effect"
+          ]
+        },
+        {
+          "name": "repetition",
+          "alternatives": [
+            "repeated"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "def-2",
+      "category": "definition",
+      "split": "development",
+      "query": "What is backpressure?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "backpressure"
+      ],
+      "facets": [
+        {
+          "name": "producer",
+          "alternatives": [
+            "producer"
+          ]
+        },
+        {
+          "name": "consumer",
+          "alternatives": [
+            "consumer"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "def-3",
+      "category": "definition",
+      "split": "development",
+      "query": "What is a circuit breaker?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "breaker"
+      ],
+      "facets": [
+        {
+          "name": "stop requests",
+          "alternatives": [
+            "stops requests"
+          ]
+        },
+        {
+          "name": "failing dependency",
+          "alternatives": [
+            "failing dependency"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "def-4",
+      "category": "definition",
+      "split": "validation",
+      "query": "What is a blue-green release?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "bluegreen"
+      ],
+      "facets": [
+        {
+          "name": "two environments",
+          "alternatives": [
+            "two environments"
+          ]
+        },
+        {
+          "name": "traffic",
+          "alternatives": [
+            "traffic"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exp-1",
+      "category": "explanation",
+      "split": "development",
+      "query": "Why does the queue use backpressure?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "backpressure"
+      ],
+      "facets": [
+        {
+          "name": "memory exhaustion",
+          "alternatives": [
+            "exhaust memory"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exp-2",
+      "category": "explanation",
+      "split": "development",
+      "query": "How does a circuit breaker check for recovery?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "breaker"
+      ],
+      "facets": [
+        {
+          "name": "cooldown",
+          "alternatives": [
+            "cooldown"
+          ]
+        },
+        {
+          "name": "trial",
+          "alternatives": [
+            "trial request"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exp-3",
+      "category": "explanation",
+      "split": "development",
+      "query": "How does the parcel API avoid duplicate shipments?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "idempotency"
+      ],
+      "facets": [
+        {
+          "name": "request token",
+          "alternatives": [
+            "request token"
+          ]
+        },
+        {
+          "name": "duplicate",
+          "alternatives": [
+            "duplicate submissions"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exp-4",
+      "category": "explanation",
+      "split": "validation",
+      "query": "How does rollback work in blue-green releases?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "bluegreen"
+      ],
+      "facets": [
+        {
+          "name": "return traffic",
+          "alternatives": [
+            "switches traffic back"
+          ]
+        },
+        {
+          "name": "prior environment",
+          "alternatives": [
+            "previous environment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cmp-1",
+      "category": "comparison",
+      "split": "development",
+      "query": "Compare CSV export and JSON export for capacity",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "csv",
+        "json"
+      ],
+      "facets": [
+        {
+          "name": "csv capacity",
+          "alternatives": [
+            "fifty thousand"
+          ]
+        },
+        {
+          "name": "json capacity",
+          "alternatives": [
+            "ten thousand"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cmp-2",
+      "category": "comparison",
+      "split": "development",
+      "query": "Compare CSV export and JSON export for nested data",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "csv",
+        "json"
+      ],
+      "facets": [
+        {
+          "name": "flattening",
+          "alternatives": [
+            "flattens"
+          ]
+        },
+        {
+          "name": "preservation",
+          "alternatives": [
+            "preserves nested"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cmp-3",
+      "category": "comparison",
+      "split": "development",
+      "query": "Compare email verification and device activation for link expiry",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "email",
+        "device"
+      ],
+      "facets": [
+        {
+          "name": "email duration",
+          "alternatives": [
+            "twenty minutes"
+          ]
+        },
+        {
+          "name": "device duration",
+          "alternatives": [
+            "forty minutes"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cmp-4",
+      "category": "comparison",
+      "split": "validation",
+      "query": "Compare CSV export and JSON export for expiration",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "csv",
+        "json"
+      ],
+      "facets": [
+        {
+          "name": "csv expiry",
+          "alternatives": [
+            "six hours"
+          ]
+        },
+        {
+          "name": "json expiry",
+          "alternatives": [
+            "twelve hours"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-1",
+      "category": "multipart",
+      "split": "development",
+      "query": "How long does Lark depot hold parcels and what must a recipient bring?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "parcel"
+      ],
+      "facets": [
+        {
+          "name": "holding period",
+          "alternatives": [
+            "three days"
+          ]
+        },
+        {
+          "name": "identification",
+          "alternatives": [
+            "photo identification"
+          ]
+        },
+        {
+          "name": "code",
+          "alternatives": [
+            "collection code"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-2",
+      "category": "multipart",
+      "split": "development",
+      "query": "How long is a studio booking and how far ahead can members reserve it?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "room"
+      ],
+      "facets": [
+        {
+          "name": "duration",
+          "alternatives": [
+            "ninety minutes"
+          ]
+        },
+        {
+          "name": "advance",
+          "alternatives": [
+            "seven days"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-3",
+      "category": "multipart",
+      "split": "development",
+      "query": "When does an email verification link expire and what happens to the earlier link when a replacement is requested?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "email"
+      ],
+      "facets": [
+        {
+          "name": "expiry",
+          "alternatives": [
+            "twenty minutes"
+          ]
+        },
+        {
+          "name": "invalidation",
+          "alternatives": [
+            "invalidates the earlier link"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-4",
+      "category": "multipart",
+      "split": "validation",
+      "query": "How many records does JSON export support and how long do its jobs last?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "json"
+      ],
+      "facets": [
+        {
+          "name": "capacity",
+          "alternatives": [
+            "ten thousand"
+          ]
+        },
+        {
+          "name": "duration",
+          "alternatives": [
+            "twelve hours"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "para-1",
+      "category": "paraphrase",
+      "split": "development",
+      "query": "What should I take with me to pick up my delivery at Lark?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "parcel"
+      ],
+      "facets": [
+        {
+          "name": "id",
+          "alternatives": [
+            "photo identification"
+          ]
+        },
+        {
+          "name": "code",
+          "alternatives": [
+            "collection code"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "para-2",
+      "category": "paraphrase",
+      "split": "development",
+      "query": "Can resending the same parcel request create another shipment?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "idempotency"
+      ],
+      "facets": [
+        {
+          "name": "token",
+          "alternatives": [
+            "request token"
+          ]
+        },
+        {
+          "name": "deduplication",
+          "alternatives": [
+            "avoid creating a second shipment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "para-3",
+      "category": "paraphrase",
+      "split": "development",
+      "query": "How much time do I get to use the studio I reserved?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "room"
+      ],
+      "facets": [
+        {
+          "name": "duration",
+          "alternatives": [
+            "ninety minutes"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "para-4",
+      "category": "paraphrase",
+      "split": "validation",
+      "query": "If the person reading queue messages falls behind, how is memory protected?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "backpressure"
+      ],
+      "facets": [
+        {
+          "name": "slowing",
+          "alternatives": [
+            "slows",
+            "pause"
+          ]
+        },
+        {
+          "name": "memory",
+          "alternatives": [
+            "memory"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "list-1",
+      "category": "list",
+      "split": "development",
+      "query": "List the field launch steps",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "launch"
+      ],
+      "facets": [
+        {
+          "name": "Inspect the enclosure",
+          "alternatives": [
+            "Inspect the enclosure"
+          ]
+        },
+        {
+          "name": "Charge the battery",
+          "alternatives": [
+            "Charge the battery"
+          ]
+        },
+        {
+          "name": "Calibrate the sensor",
+          "alternatives": [
+            "Calibrate the sensor"
+          ]
+        },
+        {
+          "name": "Record the serial number",
+          "alternatives": [
+            "Record the serial number"
+          ]
+        },
+        {
+          "name": "Obtain supervisor approval",
+          "alternatives": [
+            "Obtain supervisor approval"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "list-2",
+      "category": "list",
+      "split": "development",
+      "query": "What are the archive restoration steps?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "archive"
+      ],
+      "facets": [
+        {
+          "name": "Verify the checksum",
+          "alternatives": [
+            "Verify the checksum"
+          ]
+        },
+        {
+          "name": "Unlock the archive",
+          "alternatives": [
+            "Unlock the archive"
+          ]
+        },
+        {
+          "name": "Restore the files",
+          "alternatives": [
+            "Restore the files"
+          ]
+        },
+        {
+          "name": "Validate the restored copy",
+          "alternatives": [
+            "Validate the restored copy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "list-3",
+      "category": "list",
+      "split": "development",
+      "query": "Which items does a recipient need for Lark parcel collection?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "parcel"
+      ],
+      "facets": [
+        {
+          "name": "identification",
+          "alternatives": [
+            "photo identification"
+          ]
+        },
+        {
+          "name": "code",
+          "alternatives": [
+            "collection code"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "list-4",
+      "category": "list",
+      "split": "validation",
+      "query": "What are the requirements for device activation?",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "device"
+      ],
+      "facets": [
+        {
+          "name": "serial number",
+          "alternatives": [
+            "serial number"
+          ]
+        },
+        {
+          "name": "approval",
+          "alternatives": [
+            "administrator approval code"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "amb-1",
+      "category": "ambiguity",
+      "split": "development",
+      "query": "When does the link expire?",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "facets": []
+    },
+    {
+      "id": "amb-2",
+      "category": "ambiguity",
+      "split": "development",
+      "query": "What is the export limit?",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "facets": []
+    },
+    {
+      "id": "amb-3",
+      "category": "ambiguity",
+      "split": "development",
+      "query": "How long does it last?",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "facets": []
+    },
+    {
+      "id": "amb-4",
+      "category": "ambiguity",
+      "split": "validation",
+      "query": "Which code do I need?",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "facets": []
+    },
+    {
+      "id": "none-1",
+      "category": "missing_evidence",
+      "split": "development",
+      "query": "What is the price of a studio booking?",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "facets": []
+    },
+    {
+      "id": "none-2",
+      "category": "missing_evidence",
+      "split": "development",
+      "query": "Who founded Lark depot?",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "facets": []
+    },
+    {
+      "id": "none-3",
+      "category": "missing_evidence",
+      "split": "development",
+      "query": "What is the maximum battery temperature during field launch?",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "facets": []
+    },
+    {
+      "id": "none-4",
+      "category": "missing_evidence",
+      "split": "validation",
+      "query": "Does the parcel API guarantee delivery within one hour?",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "facets": []
+    }
+  ]
+}

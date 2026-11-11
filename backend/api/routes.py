@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import uuid
 import asyncio
+from backend.eval.quality import load_snapshot
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse, PlainTextResponse, Response
 from typing import List, Dict, Any, Optional
@@ -73,6 +74,7 @@ def create_router(
     def evaluation(request: Request):
         demo_limit(request, "evaluation", 12, 60)
         result = run_benchmark()
+        result["research_quality"] = load_snapshot()
         result["semantic"] = evaluate_semantic(vector_store.embedder) if vector_store.embedder and vector_store.embedder.prepare() else None
         return result
 

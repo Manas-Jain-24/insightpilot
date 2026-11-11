@@ -53,6 +53,7 @@ def best_sentence(query: str, passage: str) -> str:
     is_causal = bool(re.search(r"\b(why|cause|caused|causes|reason)\b", lowered))
     is_process = bool(re.search(r"\bhow\s+(?:does|do|did)\b|\bwork(?:s)?\b", lowered))
     is_comparison = bool(re.search(r"\b(compare|comparison|versus|vs|difference)\b", lowered))
+    asks_requirements = bool(re.search(r"\b(items?|requirements?|need|bring|require)\b", lowered))
     candidates = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])", passage.strip())
     scored = []
     for position, sentence in enumerate(candidates):
@@ -65,6 +66,8 @@ def best_sentence(query: str, passage: str) -> str:
         if not overlap:
             continue
         score = overlap / len(sentence_terms)
+        if asks_requirements and re.search(r"\b(must|need\w*|requir\w*|bring|include\w*)\b", sentence, re.I):
+            score += 0.8
         causal_cue = re.search(r"\b(caus\w*|trigger\w*|because|due|led|result\w*|collaps\w*|began|phase)\b", sentence, re.I)
         process_cue = re.search(r"\b(convert\w*|through|using|by|when|process|produc\w*|use\w*)\b", sentence, re.I)
         if is_causal and not causal_cue or is_process and not process_cue:

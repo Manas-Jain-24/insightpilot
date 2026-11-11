@@ -128,6 +128,23 @@ cp .env.example .env
 
 Open **Evaluation** in the top bar to run the bundled offline benchmarks. Retrieval cases use [`evaluation/questions.json`](evaluation/questions.json); answer checks use [`evaluation/answer_cases.json`](evaluation/answer_cases.json) to measure answer relevance, citation wiring, and abstention. These checks do not establish whether statements in source documents are true or score live Gemini responses.
 
+The panel also shows a **recorded broader answer evaluation** from [`evaluation/reports/quality-latest.json`](evaluation/reports/quality-latest.json). Its 32 questions cover eight categories over a separate synthetic corpus: definitions, explanations, comparisons, multipart questions, paraphrases, lists, ambiguity, and missing evidence. The runner uses the production document orchestrator, chunking, retrieval, and no-key answer path. It never calls Gemini or the web, even if a server API key is configured.
+
+```bash
+# Requires no downloaded model:
+python scripts/run_quality_eval.py --split all --retrieval keyword --output data/quality.json
+# Requires scripts/prepare_embeddings.py to have completed:
+python scripts/run_quality_eval.py --split all --retrieval both --output data/quality.json --compare evaluation/reports/quality-latest.json
+```
+
+The 24 development questions and eight reserved validation questions were authored together; this is not a blind or independent benchmark. Development results selected the first fixes; validation results are retained without tuning against them. Saved runs include dataset and backend-code fingerprints, answer modes, actual retrieval modes, retrieved/cited source IDs, latency, missing answer facets, and failed checks. Answer facets are checked against summaries and findings, not citation snippets. Evidence checks require real source chunks, valid citation links, and copied support; they cannot establish source truth or logical entailment. Passage-only responses can meet concept checks without providing a synthesized explanation. Treat the results as diagnostic behavior checks, not general accuracy.
+
+The original development baseline is preserved in [`quality-baseline.json`](evaluation/reports/quality-baseline.json). CI runs the keyword suite and fails when a previously passing case regresses relative to the latest recorded run, or a pipeline error occurs. Existing failures stay visible; the suite does not require claiming that every question is solved. Use `--fail-on-regression` with `--compare` to apply the same gate locally.
+
+The first recorded development comparison improved from 9/24 to 17/24 passing cases for keywords and from 15/24 to 24/24 for hybrid retrieval, without losing a previously passing case. On the eight reserved validation questions, keywords passed 4/8 and hybrid passed 5/8; overall results were 21/32 and 29/32 respectively. Hybrid validation failures remain for a pronoun-dependent multipart question, an ambiguous code request, and an unsupported delivery guarantee. These failures are preserved in the recorded report and the Evaluation panel.
+
+The fallback now reserves evidence for each explicitly worded question clause (for example, “how long … and what …”), deduplicates overlapping sentences, and identifies unanswered clauses. Conservative rules also request a subject when short value questions match competing document subjects, and decline some missing attributes such as price, temperature, and authorship. These rules cover common patterns; they are not a universal answerability or ambiguity detector. Live Gemini behavior and web reliability require separate evaluation.
+
 Prepare semantic search once after installing dependencies:
 
 ```bash

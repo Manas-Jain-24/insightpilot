@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from backend.models import PlanStep, Citation, Finding, ResearchReport, ClaimEvidence
 from backend.agent.relevance import best_sentence, coverage, topic_terms
 from backend.agent.list_evidence import extract_list_report
+from backend.agent.answerability import answer_parts, missing_fact, needs_subject
 
 
 class GeminiClient:
@@ -520,26 +521,52 @@ Return only JSON: {{"claims": [{{"claim": "short answer sentence", "citation_id"
                 metrics={"mode": "no_evidence"}
             )
 
+        if needs_subject(query, citations):
+            return ResearchReport(query=query, depth=depth,
+                executive_summary="Please specify the subject, document, or policy you mean so I can choose the right evidence.",
+                metrics={"mode": "clarification_needed"})
+        parts = answer_parts(query)
+        if any(missing_fact(part, citations) for part in parts):
+            return ResearchReport(query=query, depth=depth,
+                executive_summary="The retrieved evidence does not contain the requested fact. Add a source that addresses it or narrow the question.",
+                metrics={"mode": "no_evidence"})
         list_report = extract_list_report(query, citations, depth)
         if list_report:
             return list_report
         candidates = []
         query_terms = topic_terms(query)
         needs_comparison = bool(re.search(r"\b(compare|comparison|versus|vs|difference)\b", query, re.I))
-        for citation in citations:
-            excerpt = citation.snippet.removesuffix("...").strip()
-            sentence = best_sentence(query, excerpt)
-            if not sentence or not coverage(query_terms, citation.title + " " + sentence):
-                continue
-            if needs_comparison and len(set(query_terms) & set(topic_terms(sentence))) < len(query_terms):
-                continue
-            score = coverage(query_terms, sentence) + 0.25 * coverage(query_terms, citation.title)
-            candidates.append((score, citation, sentence))
-        candidates.sort(key=lambda item: item[0], reverse=True)
+        unanswered_parts = []
+        for part in parts:
+            part_terms = topic_terms(part)
+            part_candidates = []
+            for citation in citations:
+                excerpt = citation.snippet.removesuffix("...").strip()
+                sentence = best_sentence(part, excerpt)
+                if not sentence or not coverage(part_terms, citation.title + " " + sentence):
+                    continue
+                if needs_comparison and len(set(query_terms) & set(topic_terms(sentence))) < len(query_terms):
+                    continue
+                score = coverage(part_terms, sentence) + 0.25 * coverage(part_terms, citation.title)
+                part_candidates.append((score, citation, sentence))
+            part_candidates.sort(key=lambda item: item[0], reverse=True)
+            if not part_candidates:
+                unanswered_parts.append(part)
+            # Reserve evidence for each explicit question clause before adding
+            # alternatives. Single-clause behavior retains the existing cap.
+            candidates.extend(part_candidates[:1] if len(parts) > 1 else part_candidates[:3])
+        seen = set()
+        unique = []
+        for item in candidates:
+            key = re.sub(r"\s+", " ", item[2]).casefold()
+            if key not in seen:
+                seen.add(key)
+                unique.append(item)
+        candidates = unique
         findings = [Finding(heading=c.title, content=f"{sentence} [{c.id}]", citations=[c.id],
                     evidence=[ClaimEvidence(citation_id=c.id, quote=sentence,
                         verification="search_grounding" if c.evidence_type == "grounded_claim" else "exact_quote")])
-                    for _, c, sentence in candidates[:3]]
+                    for _, c, sentence in candidates[:4]]
         if not findings:
             if any(item.get("data", {}).get("retrieval_mode") == "hybrid" for item in observations):
                 related = [c for c in citations if c.source_type == "document" and c.relevance_score >= 0.4][:3]
@@ -557,8 +584,8 @@ Return only JSON: {{"claims": [{{"claim": "short answer sentence", "citation_id"
         used_ids = {finding.citations[0] for finding in findings}
         return ResearchReport(
             query=query, depth=depth,
-            executive_summary=findings[0].content,
+            executive_summary=" ".join(finding.content for finding in findings),
             key_findings=findings,
             citations=[c for c in citations if c.id in used_ids],
-            metrics={"mode": "extractive_fallback"}
+            metrics={"mode": "extractive_fallback", "unanswered_parts": unanswered_parts if len(parts) > 1 else []}
         )

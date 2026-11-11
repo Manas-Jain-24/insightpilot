@@ -25,3 +25,5 @@ jobs:
           node --check static/js/research-stream.js
       - name: Test research stream handling
         run: node --test tests/test_research_stream.cjs
+      - name: Check offline answer regressions
+        run: python scripts/run_quality_eval.py --split all --retrieval keyword --output data/quality-ci.json --compare evaluation/reports/quality-latest.json --fail-on-regression

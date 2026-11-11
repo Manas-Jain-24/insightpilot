@@ -1,0 +1,2028 @@
+{
+  "dataset": "research-quality-v1",
+  "dataset_sha256": "62b8611e198a73bc4668ac3f8444b8ce10938add5376d831ee413433ff0981f5",
+  "code_sha256": "af15ee163513e710aea8446dbb2a601a1ed0f9faa9a9cb95e82951de5e6d5d77",
+  "created_at": "2026-11-11T06:51:11.921676+00:00",
+  "split": "development",
+  "embedding_model": "BAAI/bge-small-en-v1.5",
+  "limitations": "Synthetic, self-authored cases. Concept matching and quote attribution do not prove factual correctness or logical entailment. No Gemini or web calls. Latency includes orchestration delays and cold local embedding work.",
+  "metrics": {
+    "keyword": {
+      "cases": 24,
+      "passed": 9,
+      "case_pass_rate": 0.375,
+      "answer_facet_coverage": 0.5,
+      "safe_abstention_rate": 0.3333,
+      "unexpected_abstentions": 8,
+      "evidence_validity_rate": 1.0,
+      "pipeline_errors": 0
+    },
+    "hybrid": {
+      "cases": 24,
+      "passed": 15,
+      "case_pass_rate": 0.625,
+      "answer_facet_coverage": 0.9,
+      "safe_abstention_rate": 0.0,
+      "unexpected_abstentions": 0,
+      "evidence_validity_rate": 1.0,
+      "pipeline_errors": 0
+    }
+  },
+  "by_category": {
+    "keyword": {
+      "ambiguity": {
+        "cases": 3,
+        "passed": 2,
+        "case_pass_rate": 0.6667,
+        "answer_facet_coverage": null,
+        "safe_abstention_rate": 0.6667,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "comparison": {
+        "cases": 3,
+        "passed": 0,
+        "case_pass_rate": 0.0,
+        "answer_facet_coverage": 0.0,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 3,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "definition": {
+        "cases": 3,
+        "passed": 3,
+        "case_pass_rate": 1.0,
+        "answer_facet_coverage": 1.0,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "explanation": {
+        "cases": 3,
+        "passed": 2,
+        "case_pass_rate": 0.6667,
+        "answer_facet_coverage": 0.6,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 1,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "list": {
+        "cases": 3,
+        "passed": 2,
+        "case_pass_rate": 0.6667,
+        "answer_facet_coverage": 0.8182,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "missing_evidence": {
+        "cases": 3,
+        "passed": 0,
+        "case_pass_rate": 0.0,
+        "answer_facet_coverage": null,
+        "safe_abstention_rate": 0.0,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "multipart": {
+        "cases": 3,
+        "passed": 0,
+        "case_pass_rate": 0.0,
+        "answer_facet_coverage": 0.2857,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 1,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "paraphrase": {
+        "cases": 3,
+        "passed": 0,
+        "case_pass_rate": 0.0,
+        "answer_facet_coverage": 0.0,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 3,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      }
+    },
+    "hybrid": {
+      "ambiguity": {
+        "cases": 3,
+        "passed": 0,
+        "case_pass_rate": 0.0,
+        "answer_facet_coverage": null,
+        "safe_abstention_rate": 0.0,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "comparison": {
+        "cases": 3,
+        "passed": 3,
+        "case_pass_rate": 1.0,
+        "answer_facet_coverage": 1.0,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "definition": {
+        "cases": 3,
+        "passed": 3,
+        "case_pass_rate": 1.0,
+        "answer_facet_coverage": 1.0,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "explanation": {
+        "cases": 3,
+        "passed": 3,
+        "case_pass_rate": 1.0,
+        "answer_facet_coverage": 1.0,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "list": {
+        "cases": 3,
+        "passed": 2,
+        "case_pass_rate": 0.6667,
+        "answer_facet_coverage": 0.8182,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "missing_evidence": {
+        "cases": 3,
+        "passed": 0,
+        "case_pass_rate": 0.0,
+        "answer_facet_coverage": null,
+        "safe_abstention_rate": 0.0,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "multipart": {
+        "cases": 3,
+        "passed": 1,
+        "case_pass_rate": 0.3333,
+        "answer_facet_coverage": 0.7143,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      },
+      "paraphrase": {
+        "cases": 3,
+        "passed": 3,
+        "case_pass_rate": 1.0,
+        "answer_facet_coverage": 1.0,
+        "safe_abstention_rate": null,
+        "unexpected_abstentions": 0,
+        "evidence_validity_rate": 1.0,
+        "pipeline_errors": 0
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "def-1",
+      "query": "What is an idempotent operation?",
+      "category": "definition",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "idempotency"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "idempotency"
+      ],
+      "error": null,
+      "latency_seconds": 1.426,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "same effect",
+          "matched": true
+        },
+        {
+          "name": "repetition",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "An idempotent operation has the same effect when repeated as when performed once. [1]\nAn idempotent operation has the same effect when repeated as when performed once. [1]",
+      "cited_sources": [
+        "idempotency"
+      ]
+    },
+    {
+      "id": "def-2",
+      "query": "What is backpressure?",
+      "category": "definition",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "backpressure"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "backpressure"
+      ],
+      "error": null,
+      "latency_seconds": 1.422,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "producer",
+          "matched": true
+        },
+        {
+          "name": "consumer",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Backpressure slows a producer when a consumer cannot keep up. [1]\nBackpressure slows a producer when a consumer cannot keep up. [1]",
+      "cited_sources": [
+        "backpressure"
+      ]
+    },
+    {
+      "id": "def-3",
+      "query": "What is a circuit breaker?",
+      "category": "definition",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "breaker"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "breaker"
+      ],
+      "error": null,
+      "latency_seconds": 1.426,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "stop requests",
+          "matched": true
+        },
+        {
+          "name": "failing dependency",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "A circuit breaker stops requests to a failing dependency after repeated errors. [1]\nA circuit breaker stops requests to a failing dependency after repeated errors. [1]",
+      "cited_sources": [
+        "breaker"
+      ]
+    },
+    {
+      "id": "exp-1",
+      "query": "Why does the queue use backpressure?",
+      "category": "explanation",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "backpressure"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "backpressure"
+      ],
+      "error": null,
+      "latency_seconds": 1.417,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "memory exhaustion",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "The queue uses backpressure because unchecked arrivals would exhaust memory. [1]\nThe queue uses backpressure because unchecked arrivals would exhaust memory. [1]",
+      "cited_sources": [
+        "backpressure"
+      ]
+    },
+    {
+      "id": "exp-2",
+      "query": "How does a circuit breaker check for recovery?",
+      "category": "explanation",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "breaker"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [
+        "breaker"
+      ],
+      "error": null,
+      "latency_seconds": 1.425,
+      "passed": false,
+      "failure_reasons": [
+        "unexpected_abstention",
+        "missing_answer_facets",
+        "missing_expected_sources"
+      ],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "cooldown",
+          "matched": false
+        },
+        {
+          "name": "trial",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "cooldown",
+        "trial"
+      ],
+      "source_recall": 0.0,
+      "answer": "The retrieved sources do not contain enough relevant text to answer this question.",
+      "cited_sources": []
+    },
+    {
+      "id": "exp-3",
+      "query": "How does the parcel API avoid duplicate shipments?",
+      "category": "explanation",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "idempotency"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "idempotency"
+      ],
+      "error": null,
+      "latency_seconds": 1.429,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "request token",
+          "matched": true
+        },
+        {
+          "name": "duplicate",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "The parcel API uses a request token to recognize duplicate submissions and avoid creating a second shipment. [1]\nThe parcel API uses a request token to recognize duplicate submissions and avoid creating a second shipment. [1]",
+      "cited_sources": [
+        "idempotency"
+      ]
+    },
+    {
+      "id": "cmp-1",
+      "query": "Compare CSV export and JSON export for capacity",
+      "category": "comparison",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "csv",
+        "json"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [],
+      "error": null,
+      "latency_seconds": 1.434,
+      "passed": false,
+      "failure_reasons": [
+        "unexpected_abstention",
+        "missing_answer_facets",
+        "missing_expected_sources"
+      ],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "csv capacity",
+          "matched": false
+        },
+        {
+          "name": "json capacity",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "csv capacity",
+        "json capacity"
+      ],
+      "source_recall": 0.0,
+      "answer": "No source relevant enough to answer this question was found. Try a narrower question or add a relevant document.",
+      "cited_sources": []
+    },
+    {
+      "id": "cmp-2",
+      "query": "Compare CSV export and JSON export for nested data",
+      "category": "comparison",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "csv",
+        "json"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [
+        "csv",
+        "json"
+      ],
+      "error": null,
+      "latency_seconds": 1.42,
+      "passed": false,
+      "failure_reasons": [
+        "unexpected_abstention",
+        "missing_answer_facets",
+        "missing_expected_sources"
+      ],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "flattening",
+          "matched": false
+        },
+        {
+          "name": "preservation",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "flattening",
+        "preservation"
+      ],
+      "source_recall": 0.0,
+      "answer": "The retrieved sources do not contain enough relevant text to answer this question.",
+      "cited_sources": []
+    },
+    {
+      "id": "cmp-3",
+      "query": "Compare email verification and device activation for link expiry",
+      "category": "comparison",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "email",
+        "device"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [],
+      "error": null,
+      "latency_seconds": 1.435,
+      "passed": false,
+      "failure_reasons": [
+        "unexpected_abstention",
+        "missing_answer_facets",
+        "missing_expected_sources"
+      ],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "email duration",
+          "matched": false
+        },
+        {
+          "name": "device duration",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "email duration",
+        "device duration"
+      ],
+      "source_recall": 0.0,
+      "answer": "No source relevant enough to answer this question was found. Try a narrower question or add a relevant document.",
+      "cited_sources": []
+    },
+    {
+      "id": "multi-1",
+      "query": "How long does Lark depot hold parcels and what must a recipient bring?",
+      "category": "multipart",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "parcel"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [
+        "parcel"
+      ],
+      "error": null,
+      "latency_seconds": 1.422,
+      "passed": false,
+      "failure_reasons": [
+        "unexpected_abstention",
+        "missing_answer_facets",
+        "missing_expected_sources"
+      ],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "holding period",
+          "matched": false
+        },
+        {
+          "name": "identification",
+          "matched": false
+        },
+        {
+          "name": "code",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "holding period",
+        "identification",
+        "code"
+      ],
+      "source_recall": 0.0,
+      "answer": "The retrieved sources do not contain enough relevant text to answer this question.",
+      "cited_sources": []
+    },
+    {
+      "id": "multi-2",
+      "query": "How long is a studio booking and how far ahead can members reserve it?",
+      "category": "multipart",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "room"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "room"
+      ],
+      "error": null,
+      "latency_seconds": 1.424,
+      "passed": false,
+      "failure_reasons": [
+        "missing_answer_facets"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "duration",
+          "matched": false
+        },
+        {
+          "name": "advance",
+          "matched": true
+        }
+      ],
+      "missing_facets": [
+        "duration"
+      ],
+      "source_recall": 1.0,
+      "answer": "Members may reserve a studio up to seven days ahead. [1]\nMembers may reserve a studio up to seven days ahead. [1]",
+      "cited_sources": [
+        "room"
+      ]
+    },
+    {
+      "id": "multi-3",
+      "query": "When does an email verification link expire and what happens to the earlier link when a replacement is requested?",
+      "category": "multipart",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "email"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "email"
+      ],
+      "error": null,
+      "latency_seconds": 1.428,
+      "passed": false,
+      "failure_reasons": [
+        "missing_answer_facets"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "expiry",
+          "matched": false
+        },
+        {
+          "name": "invalidation",
+          "matched": true
+        }
+      ],
+      "missing_facets": [
+        "expiry"
+      ],
+      "source_recall": 1.0,
+      "answer": "Requesting a replacement email verification link invalidates the earlier link. [1]\nRequesting a replacement email verification link invalidates the earlier link. [1]",
+      "cited_sources": [
+        "email"
+      ]
+    },
+    {
+      "id": "para-1",
+      "query": "What should I take with me to pick up my delivery at Lark?",
+      "category": "paraphrase",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "parcel"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [],
+      "error": null,
+      "latency_seconds": 1.424,
+      "passed": false,
+      "failure_reasons": [
+        "unexpected_abstention",
+        "missing_answer_facets",
+        "missing_expected_sources"
+      ],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "id",
+          "matched": false
+        },
+        {
+          "name": "code",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "id",
+        "code"
+      ],
+      "source_recall": 0.0,
+      "answer": "No source relevant enough to answer this question was found. Try a narrower question or add a relevant document.",
+      "cited_sources": []
+    },
+    {
+      "id": "para-2",
+      "query": "Can resending the same parcel request create another shipment?",
+      "category": "paraphrase",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "idempotency"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [
+        "idempotency"
+      ],
+      "error": null,
+      "latency_seconds": 1.43,
+      "passed": false,
+      "failure_reasons": [
+        "unexpected_abstention",
+        "missing_answer_facets",
+        "missing_expected_sources"
+      ],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "token",
+          "matched": false
+        },
+        {
+          "name": "deduplication",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "token",
+        "deduplication"
+      ],
+      "source_recall": 0.0,
+      "answer": "The retrieved sources do not contain enough relevant text to answer this question.",
+      "cited_sources": []
+    },
+    {
+      "id": "para-3",
+      "query": "How much time do I get to use the studio I reserved?",
+      "category": "paraphrase",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "room"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [],
+      "error": null,
+      "latency_seconds": 1.423,
+      "passed": false,
+      "failure_reasons": [
+        "unexpected_abstention",
+        "missing_answer_facets",
+        "missing_expected_sources"
+      ],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "duration",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "duration"
+      ],
+      "source_recall": 0.0,
+      "answer": "No source relevant enough to answer this question was found. Try a narrower question or add a relevant document.",
+      "cited_sources": []
+    },
+    {
+      "id": "list-1",
+      "query": "List the field launch steps",
+      "category": "list",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "launch"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_list",
+      "retrieved_sources": [
+        "launch"
+      ],
+      "error": null,
+      "latency_seconds": 1.425,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "Inspect the enclosure",
+          "matched": true
+        },
+        {
+          "name": "Charge the battery",
+          "matched": true
+        },
+        {
+          "name": "Calibrate the sensor",
+          "matched": true
+        },
+        {
+          "name": "Record the serial number",
+          "matched": true
+        },
+        {
+          "name": "Obtain supervisor approval",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Found 5 listed items in the retrieved evidence, shown below in source order. This may not be the complete list in the original source.\nInspect the enclosure. [1]\nCharge the battery. [1]\nCalibrate the sensor. [1]\nRecord the serial number. [1]\nObtain supervisor approval. [1]",
+      "cited_sources": [
+        "launch"
+      ]
+    },
+    {
+      "id": "list-2",
+      "query": "What are the archive restoration steps?",
+      "category": "list",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "archive"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_list",
+      "retrieved_sources": [
+        "archive"
+      ],
+      "error": null,
+      "latency_seconds": 1.424,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "Verify the checksum",
+          "matched": true
+        },
+        {
+          "name": "Unlock the archive",
+          "matched": true
+        },
+        {
+          "name": "Restore the files",
+          "matched": true
+        },
+        {
+          "name": "Validate the restored copy",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Found 4 listed items in the retrieved evidence, shown below in source order. This may not be the complete list in the original source.\nVerify the checksum. [1]\nUnlock the archive. [1]\nRestore the files. [1]\nValidate the restored copy. [1]",
+      "cited_sources": [
+        "archive"
+      ]
+    },
+    {
+      "id": "list-3",
+      "query": "Which items does a recipient need for Lark parcel collection?",
+      "category": "list",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "parcel"
+      ],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "parcel"
+      ],
+      "error": null,
+      "latency_seconds": 1.424,
+      "passed": false,
+      "failure_reasons": [
+        "missing_answer_facets"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "identification",
+          "matched": false
+        },
+        {
+          "name": "code",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "identification",
+        "code"
+      ],
+      "source_recall": 1.0,
+      "answer": "Lark depot holds parcels for three days. [1]\nLark depot holds parcels for three days. [1]",
+      "cited_sources": [
+        "parcel"
+      ]
+    },
+    {
+      "id": "amb-1",
+      "query": "When does the link expire?",
+      "category": "ambiguity",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "device",
+        "email"
+      ],
+      "error": null,
+      "latency_seconds": 1.423,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "An email verification link expires after twenty minutes. [1]\nAn email verification link expires after twenty minutes. [1]\nA device activation link expires after forty minutes. [2]",
+      "cited_sources": [
+        "device",
+        "email"
+      ]
+    },
+    {
+      "id": "amb-2",
+      "query": "What is the export limit?",
+      "category": "ambiguity",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [],
+      "error": null,
+      "latency_seconds": 1.422,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "No source relevant enough to answer this question was found. Try a narrower question or add a relevant document.",
+      "cited_sources": []
+    },
+    {
+      "id": "amb-3",
+      "query": "How long does it last?",
+      "category": "ambiguity",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "no_evidence",
+      "retrieved_sources": [],
+      "error": null,
+      "latency_seconds": 1.427,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": true,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "No source relevant enough to answer this question was found. Try a narrower question or add a relevant document.",
+      "cited_sources": []
+    },
+    {
+      "id": "none-1",
+      "query": "What is the price of a studio booking?",
+      "category": "missing_evidence",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "room"
+      ],
+      "error": null,
+      "latency_seconds": 1.429,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "A studio booking lasts ninety minutes. [1]\nA studio booking lasts ninety minutes. [1]",
+      "cited_sources": [
+        "room"
+      ]
+    },
+    {
+      "id": "none-2",
+      "query": "Who founded Lark depot?",
+      "category": "missing_evidence",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "parcel"
+      ],
+      "error": null,
+      "latency_seconds": 1.429,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "Lark depot holds parcels for three days. [1]\nLark depot holds parcels for three days. [1]",
+      "cited_sources": [
+        "parcel"
+      ]
+    },
+    {
+      "id": "none-3",
+      "query": "What is the maximum battery temperature during field launch?",
+      "category": "missing_evidence",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "keyword",
+      "actual_retrieval": "keyword",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "launch"
+      ],
+      "error": null,
+      "latency_seconds": 1.425,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "# Field launch checklist\nThe field launch steps are:\n- Inspect the enclosure. - Charge the battery. - Calibrate the sensor. - Record the serial number. - Obtain supervisor approval. # Lunch arrangements\n- Order soup. - Collect bread. [1]\n# Field launch checklist\nThe field launch steps are:\n- Inspect the enclosure. - Charge the battery. - Calibrate the sensor. - Record the serial number. - Obtain supervisor approval. # Lunch arrangements\n- Order soup. - Collect bread. [1]",
+      "cited_sources": [
+        "launch"
+      ]
+    },
+    {
+      "id": "def-1",
+      "query": "What is an idempotent operation?",
+      "category": "definition",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "idempotency"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "idempotency"
+      ],
+      "error": null,
+      "latency_seconds": 1.714,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "same effect",
+          "matched": true
+        },
+        {
+          "name": "repetition",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "An idempotent operation has the same effect when repeated as when performed once. [1]\nAn idempotent operation has the same effect when repeated as when performed once. [1]",
+      "cited_sources": [
+        "idempotency"
+      ]
+    },
+    {
+      "id": "def-2",
+      "query": "What is backpressure?",
+      "category": "definition",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "backpressure"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "backpressure"
+      ],
+      "error": null,
+      "latency_seconds": 1.443,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "producer",
+          "matched": true
+        },
+        {
+          "name": "consumer",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Backpressure slows a producer when a consumer cannot keep up. [1]\nBackpressure slows a producer when a consumer cannot keep up. [1]",
+      "cited_sources": [
+        "backpressure"
+      ]
+    },
+    {
+      "id": "def-3",
+      "query": "What is a circuit breaker?",
+      "category": "definition",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "breaker"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "breaker"
+      ],
+      "error": null,
+      "latency_seconds": 1.436,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "stop requests",
+          "matched": true
+        },
+        {
+          "name": "failing dependency",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "A circuit breaker stops requests to a failing dependency after repeated errors. [1]\nA circuit breaker stops requests to a failing dependency after repeated errors. [1]",
+      "cited_sources": [
+        "breaker"
+      ]
+    },
+    {
+      "id": "exp-1",
+      "query": "Why does the queue use backpressure?",
+      "category": "explanation",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "backpressure"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "backpressure",
+        "idempotency"
+      ],
+      "error": null,
+      "latency_seconds": 1.429,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "memory exhaustion",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "The queue uses backpressure because unchecked arrivals would exhaust memory. [1]\nThe queue uses backpressure because unchecked arrivals would exhaust memory. [1]",
+      "cited_sources": [
+        "backpressure"
+      ]
+    },
+    {
+      "id": "exp-2",
+      "query": "How does a circuit breaker check for recovery?",
+      "category": "explanation",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "breaker"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "breaker"
+      ],
+      "error": null,
+      "latency_seconds": 1.426,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "cooldown",
+          "matched": true
+        },
+        {
+          "name": "trial",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nA circuit breaker stops requests to a failing dependency after repeated errors. After a cooldown, a trial request checks whether the dependency has recovered. This prevents repeated failures from overwhelming the caller. [1]",
+      "cited_sources": [
+        "breaker"
+      ]
+    },
+    {
+      "id": "exp-3",
+      "query": "How does the parcel API avoid duplicate shipments?",
+      "category": "explanation",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "idempotency"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "idempotency",
+        "parcel"
+      ],
+      "error": null,
+      "latency_seconds": 1.443,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "request token",
+          "matched": true
+        },
+        {
+          "name": "duplicate",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "The parcel API uses a request token to recognize duplicate submissions and avoid creating a second shipment. [1]\nThe parcel API uses a request token to recognize duplicate submissions and avoid creating a second shipment. [1]",
+      "cited_sources": [
+        "idempotency"
+      ]
+    },
+    {
+      "id": "cmp-1",
+      "query": "Compare CSV export and JSON export for capacity",
+      "category": "comparison",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "csv",
+        "json"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "csv",
+        "json"
+      ],
+      "error": null,
+      "latency_seconds": 1.44,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "csv capacity",
+          "matched": true
+        },
+        {
+          "name": "json capacity",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nJSON export supports up to ten thousand records per file. JSON export preserves nested objects. JSON export jobs expire after twelve hours. [1]\nCSV export supports up to fifty thousand rows per file. CSV export flattens nested fields into columns. CSV export jobs expire after six hours. [2]",
+      "cited_sources": [
+        "csv",
+        "json"
+      ]
+    },
+    {
+      "id": "cmp-2",
+      "query": "Compare CSV export and JSON export for nested data",
+      "category": "comparison",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "csv",
+        "json"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "csv",
+        "json"
+      ],
+      "error": null,
+      "latency_seconds": 1.429,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "flattening",
+          "matched": true
+        },
+        {
+          "name": "preservation",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nJSON export supports up to ten thousand records per file. JSON export preserves nested objects. JSON export jobs expire after twelve hours. [1]\nCSV export supports up to fifty thousand rows per file. CSV export flattens nested fields into columns. CSV export jobs expire after six hours. [2]",
+      "cited_sources": [
+        "csv",
+        "json"
+      ]
+    },
+    {
+      "id": "cmp-3",
+      "query": "Compare email verification and device activation for link expiry",
+      "category": "comparison",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "email",
+        "device"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "device",
+        "email"
+      ],
+      "error": null,
+      "latency_seconds": 1.438,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "email duration",
+          "matched": true
+        },
+        {
+          "name": "device duration",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nAn email verification link expires after twenty minutes. Requesting a replacement email verification link invalidates the earlier link. The system does not disclose whether an email address belongs to a registered account. [1]\nA device activation link expires after forty minutes. Device activation requires the device serial number and an administrator approval code. [2]",
+      "cited_sources": [
+        "device",
+        "email"
+      ]
+    },
+    {
+      "id": "multi-1",
+      "query": "How long does Lark depot hold parcels and what must a recipient bring?",
+      "category": "multipart",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "parcel"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "parcel"
+      ],
+      "error": null,
+      "latency_seconds": 1.446,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "holding period",
+          "matched": true
+        },
+        {
+          "name": "identification",
+          "matched": true
+        },
+        {
+          "name": "code",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nLark depot holds parcels for three days. A recipient must bring photo identification and the collection code. Uncollected parcels return to the sender after the holding period. The depot closes at 18:00 on weekdays. [1]",
+      "cited_sources": [
+        "parcel"
+      ]
+    },
+    {
+      "id": "multi-2",
+      "query": "How long is a studio booking and how far ahead can members reserve it?",
+      "category": "multipart",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "room"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "parcel",
+        "room"
+      ],
+      "error": null,
+      "latency_seconds": 1.446,
+      "passed": false,
+      "failure_reasons": [
+        "missing_answer_facets"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "duration",
+          "matched": false
+        },
+        {
+          "name": "advance",
+          "matched": true
+        }
+      ],
+      "missing_facets": [
+        "duration"
+      ],
+      "source_recall": 1.0,
+      "answer": "Members may reserve a studio up to seven days ahead. [1]\nMembers may reserve a studio up to seven days ahead. [1]",
+      "cited_sources": [
+        "room"
+      ]
+    },
+    {
+      "id": "multi-3",
+      "query": "When does an email verification link expire and what happens to the earlier link when a replacement is requested?",
+      "category": "multipart",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "email"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "breaker",
+        "device",
+        "email"
+      ],
+      "error": null,
+      "latency_seconds": 1.44,
+      "passed": false,
+      "failure_reasons": [
+        "missing_answer_facets"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "expiry",
+          "matched": false
+        },
+        {
+          "name": "invalidation",
+          "matched": true
+        }
+      ],
+      "missing_facets": [
+        "expiry"
+      ],
+      "source_recall": 1.0,
+      "answer": "Requesting a replacement email verification link invalidates the earlier link. [1]\nRequesting a replacement email verification link invalidates the earlier link. [1]",
+      "cited_sources": [
+        "email"
+      ]
+    },
+    {
+      "id": "para-1",
+      "query": "What should I take with me to pick up my delivery at Lark?",
+      "category": "paraphrase",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "parcel"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "parcel"
+      ],
+      "error": null,
+      "latency_seconds": 1.452,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "id",
+          "matched": true
+        },
+        {
+          "name": "code",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nLark depot holds parcels for three days. A recipient must bring photo identification and the collection code. Uncollected parcels return to the sender after the holding period. The depot closes at 18:00 on weekdays. [1]",
+      "cited_sources": [
+        "parcel"
+      ]
+    },
+    {
+      "id": "para-2",
+      "query": "Can resending the same parcel request create another shipment?",
+      "category": "paraphrase",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "idempotency"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "idempotency",
+        "parcel"
+      ],
+      "error": null,
+      "latency_seconds": 1.454,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "token",
+          "matched": true
+        },
+        {
+          "name": "deduplication",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nAn idempotent operation has the same effect when repeated as when performed once. The parcel API uses a request token to recognize duplicate submissions and avoid creating a second shipment. [1]\nLark depot holds parcels for three days. A recipient must bring photo identification and the collection code. Uncollected parcels return to the sender after the holding period. The depot closes at 18:00 on weekdays. [2]",
+      "cited_sources": [
+        "idempotency",
+        "parcel"
+      ]
+    },
+    {
+      "id": "para-3",
+      "query": "How much time do I get to use the studio I reserved?",
+      "category": "paraphrase",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "room"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "device",
+        "email",
+        "room"
+      ],
+      "error": null,
+      "latency_seconds": 1.424,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "duration",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nA studio booking lasts ninety minutes. Members may reserve a studio up to seven days ahead. Cancel a studio booking at least two hours before it starts to release the room to other members. [1]\nA device activation link expires after forty minutes. Device activation requires the device serial number and an administrator approval code. [2]\nAn email verification link expires after twenty minutes. Requesting a replacement email verification link invalidates the earlier link. The system does not disclose whether an email address belongs to a registered account. [3]",
+      "cited_sources": [
+        "device",
+        "email",
+        "room"
+      ]
+    },
+    {
+      "id": "list-1",
+      "query": "List the field launch steps",
+      "category": "list",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "launch"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_list",
+      "retrieved_sources": [
+        "launch"
+      ],
+      "error": null,
+      "latency_seconds": 1.445,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "Inspect the enclosure",
+          "matched": true
+        },
+        {
+          "name": "Charge the battery",
+          "matched": true
+        },
+        {
+          "name": "Calibrate the sensor",
+          "matched": true
+        },
+        {
+          "name": "Record the serial number",
+          "matched": true
+        },
+        {
+          "name": "Obtain supervisor approval",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Found 5 listed items in the retrieved evidence, shown below in source order. This may not be the complete list in the original source.\nInspect the enclosure. [1]\nCharge the battery. [1]\nCalibrate the sensor. [1]\nRecord the serial number. [1]\nObtain supervisor approval. [1]",
+      "cited_sources": [
+        "launch"
+      ]
+    },
+    {
+      "id": "list-2",
+      "query": "What are the archive restoration steps?",
+      "category": "list",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "archive"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_list",
+      "retrieved_sources": [
+        "archive"
+      ],
+      "error": null,
+      "latency_seconds": 1.435,
+      "passed": true,
+      "failure_reasons": [],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "Verify the checksum",
+          "matched": true
+        },
+        {
+          "name": "Unlock the archive",
+          "matched": true
+        },
+        {
+          "name": "Restore the files",
+          "matched": true
+        },
+        {
+          "name": "Validate the restored copy",
+          "matched": true
+        }
+      ],
+      "missing_facets": [],
+      "source_recall": 1.0,
+      "answer": "Found 4 listed items in the retrieved evidence, shown below in source order. This may not be the complete list in the original source.\nVerify the checksum. [1]\nUnlock the archive. [1]\nRestore the files. [1]\nValidate the restored copy. [1]",
+      "cited_sources": [
+        "archive"
+      ]
+    },
+    {
+      "id": "list-3",
+      "query": "Which items does a recipient need for Lark parcel collection?",
+      "category": "list",
+      "split": "development",
+      "expected_behavior": "answer",
+      "expected_sources": [
+        "parcel"
+      ],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "parcel"
+      ],
+      "error": null,
+      "latency_seconds": 1.428,
+      "passed": false,
+      "failure_reasons": [
+        "missing_answer_facets"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [
+        {
+          "name": "identification",
+          "matched": false
+        },
+        {
+          "name": "code",
+          "matched": false
+        }
+      ],
+      "missing_facets": [
+        "identification",
+        "code"
+      ],
+      "source_recall": 1.0,
+      "answer": "Lark depot holds parcels for three days. [1]\nLark depot holds parcels for three days. [1]",
+      "cited_sources": [
+        "parcel"
+      ]
+    },
+    {
+      "id": "amb-1",
+      "query": "When does the link expire?",
+      "category": "ambiguity",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "device",
+        "email",
+        "json"
+      ],
+      "error": null,
+      "latency_seconds": 1.437,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "An email verification link expires after twenty minutes. [1]\nAn email verification link expires after twenty minutes. [1]\nA device activation link expires after forty minutes. [2]",
+      "cited_sources": [
+        "device",
+        "email"
+      ]
+    },
+    {
+      "id": "amb-2",
+      "query": "What is the export limit?",
+      "category": "ambiguity",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "csv",
+        "json"
+      ],
+      "error": null,
+      "latency_seconds": 1.441,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nJSON export supports up to ten thousand records per file. JSON export preserves nested objects. JSON export jobs expire after twelve hours. [1]\nCSV export supports up to fifty thousand rows per file. CSV export flattens nested fields into columns. CSV export jobs expire after six hours. [2]",
+      "cited_sources": [
+        "csv",
+        "json"
+      ]
+    },
+    {
+      "id": "amb-3",
+      "query": "How long does it last?",
+      "category": "ambiguity",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "semantic_excerpts",
+      "retrieved_sources": [
+        "device",
+        "email",
+        "json"
+      ],
+      "error": null,
+      "latency_seconds": 1.428,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "Related source passages are shown below. A generated explanation is unavailable.\nA device activation link expires after forty minutes. Device activation requires the device serial number and an administrator approval code. [1]\nAn email verification link expires after twenty minutes. Requesting a replacement email verification link invalidates the earlier link. The system does not disclose whether an email address belongs to a registered account. [2]\nJSON export supports up to ten thousand records per file. JSON export preserves nested objects. JSON export jobs expire after twelve hours. [3]",
+      "cited_sources": [
+        "device",
+        "email",
+        "json"
+      ]
+    },
+    {
+      "id": "none-1",
+      "query": "What is the price of a studio booking?",
+      "category": "missing_evidence",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "room"
+      ],
+      "error": null,
+      "latency_seconds": 1.435,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "A studio booking lasts ninety minutes. [1]\nA studio booking lasts ninety minutes. [1]",
+      "cited_sources": [
+        "room"
+      ]
+    },
+    {
+      "id": "none-2",
+      "query": "Who founded Lark depot?",
+      "category": "missing_evidence",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "parcel"
+      ],
+      "error": null,
+      "latency_seconds": 1.439,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "Lark depot holds parcels for three days. [1]\nLark depot holds parcels for three days. [1]",
+      "cited_sources": [
+        "parcel"
+      ]
+    },
+    {
+      "id": "none-3",
+      "query": "What is the maximum battery temperature during field launch?",
+      "category": "missing_evidence",
+      "split": "development",
+      "expected_behavior": "abstain",
+      "expected_sources": [],
+      "requested_retrieval": "hybrid",
+      "actual_retrieval": "hybrid",
+      "answer_mode": "extractive_fallback",
+      "retrieved_sources": [
+        "launch"
+      ],
+      "error": null,
+      "latency_seconds": 1.429,
+      "passed": false,
+      "failure_reasons": [
+        "answered_without_sufficient_context"
+      ],
+      "abstained": false,
+      "evidence_valid": true,
+      "facets": [],
+      "missing_facets": [],
+      "source_recall": null,
+      "answer": "# Field launch checklist\nThe field launch steps are:\n- Inspect the enclosure. - Charge the battery. - Calibrate the sensor. - Record the serial number. - Obtain supervisor approval. # Lunch arrangements\n- Order soup. - Collect bread. [1]\n# Field launch checklist\nThe field launch steps are:\n- Inspect the enclosure. - Charge the battery. - Calibrate the sensor. - Record the serial number. - Obtain supervisor approval. # Lunch arrangements\n- Order soup. - Collect bread. [1]",
+      "cited_sources": [
+        "launch"
+      ]
+    }
+  ]
+}

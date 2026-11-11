@@ -574,6 +574,7 @@ function renderReport(report) {
   if (["extractive_fallback", "semantic_excerpts"].includes(report.metrics?.mode)) notices.push("Showing extracted passages. They may not answer every part of your question; inspect the sources for context.");
   if (report.metrics?.mode === "extractive_list") notices.push("List items are copied from retrieved evidence in source order. Check the original source for additional items or context.");
   if (report.metrics?.list_limit_reached) notices.push("Showing the first 12 supported items. Open the source to continue reading.");
+  if (report.metrics?.unanswered_parts?.length) notices.push(`Could not answer from these sources: ${report.metrics.unanswered_parts.join("; ")}.`);
   const notice = document.getElementById("researchNotice");
   notice.textContent = notices.join(" ");
   notice.hidden = notices.length === 0;
@@ -582,7 +583,7 @@ function renderReport(report) {
   reportTimestamp.textContent = new Date((report.created_at || Date.now() / 1000) * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   reportDuration.textContent = report.metrics?.total_duration_seconds != null ? `${report.metrics.total_duration_seconds}s` : "—";
   reportCitationsCount.textContent = `${report.citations?.length || 0} Citations`;
-  const reportModeLabels = { extractive_fallback: "Source excerpts", extractive_list: "Extracted list", no_evidence: "No evidence", verified_quotes: "Verified quotes", grounded_synthesis: "Cited answer" };
+  const reportModeLabels = { extractive_fallback: "Source excerpts", extractive_list: "Extracted list", clarification_needed: "Clarification needed", no_evidence: "No evidence", verified_quotes: "Verified quotes", grounded_synthesis: "Cited answer" };
   reportModelBadge.textContent = report.metrics?.model || reportModeLabels[report.metrics?.mode] || "Evidence report";
 
   // Executive summary
@@ -834,6 +835,24 @@ async function openEvaluation() {
         </tr>`).join("")}</tbody>
       </table></div>
     `;
+    if (data.research_quality) {
+      const quality = data.research_quality;
+      const modes = Object.keys(quality.metrics);
+      const categories = Object.keys(quality.by_category[modes[0]] || {});
+      const percentage = value => value == null ? "—" : `${(value * 100).toFixed(1)}%`;
+      container.insertAdjacentHTML("beforeend", `<h4>Broader answer checks · recorded offline run</h4>
+        <p class="evaluation-description">${escapeHtml(quality.dataset)} · ${new Date(quality.created_at).toLocaleDateString()} · ${escapeHtml(quality.split)} subset. This result is saved, not rerun when you open this panel. ${escapeHtml(quality.limitations)}</p>
+        <div style="overflow-x:auto"><table class="evaluation-table"><thead><tr><th>Retrieval</th><th>Cases passed</th><th>Answer parts covered</th><th>Safe abstention</th><th>Evidence checks</th></tr></thead><tbody>
+        ${modes.map(mode => { const m = quality.metrics[mode]; return `<tr><td>${escapeHtml(mode)}</td><td>${m.passed}/${m.cases}</td><td>${percentage(m.answer_facet_coverage)}</td><td>${percentage(m.safe_abstention_rate)}</td><td>${percentage(m.evidence_validity_rate)}</td></tr>`; }).join("")}
+        </tbody></table></div>
+        <table class="evaluation-table"><thead><tr><th>Question type</th>${modes.map(mode => `<th>${escapeHtml(mode)}</th>`).join("")}</tr></thead><tbody>
+        ${categories.map(category => `<tr><td>${escapeHtml(category.replaceAll("_", " "))}</td>${modes.map(mode => { const m = quality.by_category[mode][category]; return `<td>${m.passed}/${m.cases}</td>`; }).join("")}</tr>`).join("")}</tbody></table>
+        <details><summary>Inspect failures and missing answer parts</summary>
+          <div style="overflow-x:auto"><table class="evaluation-table"><thead><tr><th>Question</th><th>Method / subset</th><th>Failure</th></tr></thead><tbody>
+          ${quality.cases.filter(row => !row.passed).map(row => `<tr><td>${escapeHtml(row.query)}</td><td>${escapeHtml(row.requested_retrieval)} / ${escapeHtml(row.split)}</td><td>${escapeHtml(row.failure_reasons.join(", ").replaceAll("_", " "))}${row.missing_facets.length ? `<br>Missing: ${escapeHtml(row.missing_facets.join("; "))}` : ""}</td></tr>`).join("")}
+          </tbody></table></div>
+        </details>`);
+    }
     if (data.semantic) {
       const semantic = data.semantic;
       container.insertAdjacentHTML("beforeend", `<h4>Keyword vs semantic retrieval · ${semantic.cases.length} independent cases</h4>
