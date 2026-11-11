@@ -572,6 +572,8 @@ function renderReport(report) {
   if (report.metrics?.retrieval_mode) notices.push(report.metrics.retrieval_mode === "hybrid" ? "Document search used meaning and keywords." : "Document search used keywords.");
   if (report.metrics?.parent_report_id) notices.push("Follow-up based on the previous report's sources.");
   if (["extractive_fallback", "semantic_excerpts"].includes(report.metrics?.mode)) notices.push("Showing extracted passages. They may not answer every part of your question; inspect the sources for context.");
+  if (report.metrics?.mode === "extractive_list") notices.push("List items are copied from retrieved evidence in source order. Check the original source for additional items or context.");
+  if (report.metrics?.list_limit_reached) notices.push("Showing the first 12 supported items. Open the source to continue reading.");
   const notice = document.getElementById("researchNotice");
   notice.textContent = notices.join(" ");
   notice.hidden = notices.length === 0;
@@ -580,7 +582,7 @@ function renderReport(report) {
   reportTimestamp.textContent = new Date((report.created_at || Date.now() / 1000) * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   reportDuration.textContent = report.metrics?.total_duration_seconds != null ? `${report.metrics.total_duration_seconds}s` : "—";
   reportCitationsCount.textContent = `${report.citations?.length || 0} Citations`;
-  const reportModeLabels = { extractive_fallback: "Source excerpts", no_evidence: "No evidence", verified_quotes: "Verified quotes", grounded_synthesis: "Cited answer" };
+  const reportModeLabels = { extractive_fallback: "Source excerpts", extractive_list: "Extracted list", no_evidence: "No evidence", verified_quotes: "Verified quotes", grounded_synthesis: "Cited answer" };
   reportModelBadge.textContent = report.metrics?.model || reportModeLabels[report.metrics?.mode] || "Evidence report";
 
   // Executive summary

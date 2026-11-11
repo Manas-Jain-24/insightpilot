@@ -116,7 +116,7 @@ class Database:
                     "citations_count": len(citations_list),
                     "model": metrics_dict.get("model") or (
                         "Source excerpts" if metrics_dict.get("mode") in {
-                            "extractive_fallback", "semantic_excerpts", "followup_evidence", "no_evidence"
+                            "extractive_fallback", "extractive_list", "semantic_excerpts", "followup_evidence", "no_evidence"
                         } else "Model not recorded")
                 })
             return results

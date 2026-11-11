@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from typing import List, Dict, Any, Optional, Tuple
 from backend.models import PlanStep, Citation, Finding, ResearchReport, ClaimEvidence
 from backend.agent.relevance import best_sentence, coverage, topic_terms
+from backend.agent.list_evidence import extract_list_report
 
 
 class GeminiClient:
@@ -519,6 +520,9 @@ Return only JSON: {{"claims": [{{"claim": "short answer sentence", "citation_id"
                 metrics={"mode": "no_evidence"}
             )
 
+        list_report = extract_list_report(query, citations, depth)
+        if list_report:
+            return list_report
         candidates = []
         query_terms = topic_terms(query)
         needs_comparison = bool(re.search(r"\b(compare|comparison|versus|vs|difference)\b", query, re.I))

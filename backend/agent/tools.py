@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from backend.rag.vector_store import VectorStore
 from backend.models import KnowledgeNode, KnowledgeEdge, KnowledgeGraph
 from backend.agent.relevance import terms, topic_terms, coverage
+from backend.agent.list_evidence import is_list_question
 
 
 class DocumentRetrievalTool:
@@ -20,15 +21,15 @@ class DocumentRetrievalTool:
         top_k = max(1, min(int(top_k), 10))
         query_terms = terms(query)
         results, retrieval_mode = self.vector_store.ranked_search(query, top_k, filter_doc_ids)
-        if re.search(r"\b(stages?|steps?|phases?|items?|list)\b", query, re.I):
+        if is_list_question(query):
             seen = {chunk.id for chunk, _ in results}
             context = []
             for chunk, _ in results:
-                for neighbor in self.vector_store.following_chunks(chunk.doc_id, chunk.chunk_index):
+                for neighbor in self.vector_store.surrounding_chunks(chunk.doc_id, chunk.chunk_index):
                     if neighbor.id not in seen:
                         seen.add(neighbor.id)
                         context.append((neighbor, coverage(query_terms, neighbor.content)))
-            results += context[:3]
+            results += context[:12]
         if not results:
             return {
                 "found": 0,
@@ -41,6 +42,7 @@ class DocumentRetrievalTool:
         for chunk, score in results:
             extracted.append({
                 "chunk_id": chunk.id,
+                "chunk_index": chunk.chunk_index,
                 "doc_id": chunk.doc_id,
                 "doc_name": chunk.doc_name,
                 "page": chunk.page_number,

@@ -111,6 +111,17 @@ class VectorStore:
             ).fetchone()
         return bytes(row[0]) if row else None
 
+    def surrounding_chunks(self, doc_id: str, chunk_index: int, radius: int = 4) -> List[DocumentChunk]:
+        """Bounded source context, including introductions before a retrieved list item."""
+        radius = max(0, min(radius, 4))
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT payload FROM chunks WHERE doc_id = ? "
+                "AND CAST(json_extract(payload, '$.chunk_index') AS INTEGER) BETWEEN ? AND ? "
+                "ORDER BY CAST(json_extract(payload, '$.chunk_index') AS INTEGER)",
+                (doc_id, chunk_index-radius, chunk_index+radius)).fetchall()
+        return [DocumentChunk.model_validate_json(row[0]) for row in rows]
+
     def has_pdf(self, doc_id: str) -> bool:
         with self._lock:
             row = self._connection.execute(

@@ -32,6 +32,7 @@ class Citation(BaseModel):
     url_or_page: Optional[str] = None
     doc_id: Optional[str] = None
     chunk_id: Optional[str] = None
+    chunk_index: Optional[int] = None
     page_number: Optional[int] = None
     retrieved_at: Optional[float] = None
     published_at: Optional[str] = None

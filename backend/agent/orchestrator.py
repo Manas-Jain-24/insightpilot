@@ -272,9 +272,10 @@ class ResearchOrchestrator:
                                     id=citation_id_counter, source_type="document",
                                     retrieved_at=time.time(),
                                     title=f"{chunk_data['doc_name']} (Page {chunk_data['page'] or 1})",
-                                    snippet=chunk_data["content"][:1200],
+                                    snippet=chunk_data["content"][:1200] + ("..." if len(chunk_data["content"]) > 1200 else ""),
                                     relevance_score=chunk_data["similarity"],
                                     doc_id=chunk_data["doc_id"], chunk_id=chunk_data["chunk_id"],
+                                    chunk_index=chunk_data.get("chunk_index"),
                                     page_number=chunk_data["page"],
                                 )
                                 citations.append(cite)
@@ -330,6 +331,7 @@ class ResearchOrchestrator:
                         url_or_page=f"Page {chunk_data['page']}" if chunk_data.get('page') else "Document Chunk",
                         doc_id=chunk_data["doc_id"],
                         chunk_id=chunk_data["chunk_id"],
+                        chunk_index=chunk_data.get("chunk_index"),
                         page_number=chunk_data["page"]
                     )
                     citations.append(cite)
